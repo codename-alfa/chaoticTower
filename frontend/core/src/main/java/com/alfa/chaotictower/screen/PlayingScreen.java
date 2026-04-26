@@ -1,6 +1,7 @@
 package com.alfa.chaotictower.screen;
 
 import com.alfa.chaotictower.Main;
+import com.alfa.chaotictower.GameAssetManager;
 import com.alfa.chaotictower.entity.Block;
 import com.alfa.chaotictower.entity.Player;
 import com.alfa.chaotictower.factory.BlockFactory;
@@ -9,6 +10,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.Array;
@@ -25,6 +27,10 @@ public class PlayingScreen extends ScreenAdapter {
     private Player player1;
     private Player player2;
 
+    // HUD Variables
+    private OrthographicCamera hudCamera;
+    private BitmapFont hudFont;
+
     public PlayingScreen(Main game) {
         this.game = game;
     }
@@ -36,6 +42,11 @@ public class PlayingScreen extends ScreenAdapter {
         debugRenderer = new Box2DDebugRenderer();
         camera = new OrthographicCamera();
         viewport = new FitViewport(40, 30, camera);
+
+        // Setup HUD Camera & Font
+        hudCamera = new OrthographicCamera();
+        hudCamera.setToOrtho(false, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        hudFont = GameAssetManager.getInstance().manager.get(GameAssetManager.FONT_HUD, BitmapFont.class);
 
         player1 = new Player(1, 10, 28);
         player2 = new Player(2, 30, 28);
@@ -101,16 +112,24 @@ public class PlayingScreen extends ScreenAdapter {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         handleInput();
-
-        world.step(1 / 60f, 10, 8);
+        world.step(1 / 60f, 10, 8); // Iterasi fisika tinggi agar stabil
 
         checkOutOfBounds();
 
         updatePlayer(player1, delta);
         updatePlayer(player2, delta);
 
+        // 1. Render Dunia Box2D
         viewport.apply();
         debugRenderer.render(world, camera.combined);
+
+        // 2. Render HUD UI (Teks Nyawa)
+        hudCamera.update();
+        game.batch.setProjectionMatrix(hudCamera.combined);
+        game.batch.begin();
+        hudFont.draw(game.batch, "Player 1: " + player1.getLives(), 50, Gdx.graphics.getHeight() - 50);
+        hudFont.draw(game.batch, "Player 2: " + player2.getLives(), Gdx.graphics.getWidth() - 300, Gdx.graphics.getHeight() - 50);
+        game.batch.end();
     }
 
     private void updatePlayer(Player player, float delta) {
@@ -143,6 +162,7 @@ public class PlayingScreen extends ScreenAdapter {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
+        hudCamera.setToOrtho(false, width, height); // Update HUD Camera
     }
 
     private void handleInput() {
@@ -155,13 +175,16 @@ public class PlayingScreen extends ScreenAdapter {
         if (block == null || !block.isControlled()) return;
 
         Vector2 pos = block.body.getPosition();
-        float fallSpeed = -5f;
+
+        float normalFallSpeed = -2.0f;
+        float fastFallSpeed = -10.0f;
+        float currentFallSpeed = normalFallSpeed;
 
         if (Gdx.input.isKeyPressed(down)) {
-            fallSpeed = -20f;
+            currentFallSpeed = fastFallSpeed;
         }
 
-        block.body.setLinearVelocity(0, fallSpeed);
+        block.body.setLinearVelocity(0, currentFallSpeed);
 
         if (Gdx.input.isKeyJustPressed(left)) {
             block.body.setTransform(pos.x - 1.0f, pos.y, block.body.getAngle());

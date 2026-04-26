@@ -57,6 +57,7 @@ public class Block implements Pool.Poolable {
             body.setFixedRotation(true);
             body.setLinearDamping(0);
         } else {
+            body.setLinearVelocity(0, 0);
             body.setGravityScale(2.5f);
             body.setFixedRotation(false);
             body.setAngularDamping(0.8f);
