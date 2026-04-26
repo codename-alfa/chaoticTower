@@ -19,7 +19,7 @@ public class Lwjgl3Launcher {
         configuration.setTitle("ChaoticTower");
         configuration.useVsync(true);
         configuration.setForegroundFPS(Lwjgl3ApplicationConfiguration.getDisplayMode().refreshRate);
-        configuration.setWindowedMode(600, 900);
+        configuration.setWindowedMode(1200, 900);
         configuration.setWindowIcon("libgdx128.png", "libgdx64.png", "libgdx32.png", "libgdx16.png");
         return configuration;
     }

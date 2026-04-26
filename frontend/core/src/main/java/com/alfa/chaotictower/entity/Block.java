@@ -10,10 +10,12 @@ import com.badlogic.gdx.utils.Pool;
 
 public class Block implements Pool.Poolable {
     public Body body;
+    public int ownerId;
     private final float TILE_SIZE = 1.0f;
     private boolean isControlled;
 
-    public void init(World world, float x, float y, Vector2[] tileOffsets) {
+    public void init(World world, float x, float y, Vector2[] tileOffsets, int ownerId) {
+        this.ownerId = ownerId;
         if (body == null) {
             BodyDef bodyDef = new BodyDef();
             bodyDef.type = BodyDef.BodyType.DynamicBody;
@@ -30,11 +32,12 @@ public class Block implements Pool.Poolable {
             }
         }
 
-        float halfTile = TILE_SIZE / 2f;
+        float halfTile = (TILE_SIZE / 2f) - 0.01f;
+
         FixtureDef fixtureDef = new FixtureDef();
         fixtureDef.density = 5.0f;
-        fixtureDef.friction = 0.8f;
-        fixtureDef.restitution = 0.02f;
+        fixtureDef.friction = 1.0f;
+        fixtureDef.restitution = 0.0f;
 
         for (Vector2 offset : tileOffsets) {
             PolygonShape shape = new PolygonShape();
@@ -52,10 +55,12 @@ public class Block implements Pool.Poolable {
         if (controlled) {
             body.setGravityScale(0);
             body.setFixedRotation(true);
+            body.setLinearDamping(0);
         } else {
             body.setGravityScale(2.5f);
             body.setFixedRotation(false);
             body.setAngularDamping(0.8f);
+            body.setLinearDamping(0.1f);
         }
     }
 
