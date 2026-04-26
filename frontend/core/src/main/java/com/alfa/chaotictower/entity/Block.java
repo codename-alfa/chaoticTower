@@ -35,8 +35,8 @@ public class Block implements Pool.Poolable {
         float halfTile = (TILE_SIZE / 2f) - 0.01f;
 
         FixtureDef fixtureDef = new FixtureDef();
-        fixtureDef.density = 5.0f;
-        fixtureDef.friction = 1.0f;
+        fixtureDef.density = 10.0f;
+        fixtureDef.friction = 3.0f;
         fixtureDef.restitution = 0.0f;
 
         for (Vector2 offset : tileOffsets) {

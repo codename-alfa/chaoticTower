@@ -24,10 +24,12 @@ public class PlayingScreen extends ScreenAdapter {
     private FitViewport viewport;
     private final Array<Block> activeBlocks = new Array<>();
 
+    // Antrean balok yang menunggu untuk dilepas kendalinya
+    private final Array<Block> blocksToSettle = new Array<>();
+
     private Player player1;
     private Player player2;
 
-    // HUD Variables
     private OrthographicCamera hudCamera;
     private BitmapFont hudFont;
 
@@ -43,7 +45,6 @@ public class PlayingScreen extends ScreenAdapter {
         camera = new OrthographicCamera();
         viewport = new FitViewport(40, 30, camera);
 
-        // Setup HUD Camera & Font
         hudCamera = new OrthographicCamera();
         hudCamera.setToOrtho(false, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         hudFont = GameAssetManager.getInstance().manager.get(GameAssetManager.FONT_HUD, BitmapFont.class);
@@ -100,9 +101,11 @@ public class PlayingScreen extends ScreenAdapter {
 
     private void checkPlayerLanding(Player player, Fixture fixture) {
         Block block = player.getCurrentBlock();
+        // Alih-alih langsung diubah, kita masukkan balok ke dalam daftar antrean
         if (block != null && fixture.getBody() == block.body) {
-            block.setControlled(false);
-            player.clearCurrentBlock();
+            if (!blocksToSettle.contains(block, true)) {
+                blocksToSettle.add(block);
+            }
         }
     }
 
@@ -111,19 +114,31 @@ public class PlayingScreen extends ScreenAdapter {
         Gdx.gl.glClearColor(0.1f, 0.4f, 0.1f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        // 1. Terima Input Pemain
         handleInput();
-        world.step(1 / 60f, 10, 8); // Iterasi fisika tinggi agar stabil
 
+        // 2. Kalkulasi Fisika Box2D (TIDAK BOLEH DIGANGGU)
+        world.step(1 / 60f, 10, 8);
+
+        // 3. EKSEKUSI ANTREAN SECARA AMAN DI SINI
+        if (blocksToSettle.size > 0) {
+            for (Block block : blocksToSettle) {
+                block.setControlled(false);
+                if (player1.getCurrentBlock() == block) player1.clearCurrentBlock();
+                if (player2.getCurrentBlock() == block) player2.clearCurrentBlock();
+            }
+            blocksToSettle.clear();
+        }
+
+        // 4. Update Game Logic
         checkOutOfBounds();
-
         updatePlayer(player1, delta);
         updatePlayer(player2, delta);
 
-        // 1. Render Dunia Box2D
+        // 5. Render Visual
         viewport.apply();
         debugRenderer.render(world, camera.combined);
 
-        // 2. Render HUD UI (Teks Nyawa)
         hudCamera.update();
         game.batch.setProjectionMatrix(hudCamera.combined);
         game.batch.begin();
@@ -162,7 +177,7 @@ public class PlayingScreen extends ScreenAdapter {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
-        hudCamera.setToOrtho(false, width, height); // Update HUD Camera
+        hudCamera.setToOrtho(false, width, height);
     }
 
     private void handleInput() {
@@ -175,7 +190,6 @@ public class PlayingScreen extends ScreenAdapter {
         if (block == null || !block.isControlled()) return;
 
         Vector2 pos = block.body.getPosition();
-
         float normalFallSpeed = -2.0f;
         float fastFallSpeed = -10.0f;
         float currentFallSpeed = normalFallSpeed;
