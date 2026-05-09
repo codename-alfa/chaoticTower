@@ -10,38 +10,38 @@ import com.badlogic.gdx.utils.Pool;
 
 public class Block implements Pool.Poolable {
 
-    private static final float TILE_SIZE = 1.0f;
+    private static final float TILE_SIZE = 0.5f;
     private static final float HALF_TILE = (TILE_SIZE / 2f) - 0.01f;
+
+    private static final float DENSITY              = 1.5f;
+    private static final float FRICTION             = 0.55f;
+    private static final float RESTITUTION          = 0.0f;
+
+    private static final float RELEASED_GRAVITY_SCALE   = 1.2f;
+    private static final float RELEASED_ANGULAR_DAMPING = 2.5f;
+    private static final float RELEASED_LINEAR_DAMPING  = 0.05f;
 
     public Body body;
     public int ownerId;
     private boolean isControlled;
 
-    // FixtureDef di-cache per-instance: dibuat SEKALI di konstruktor,
-    // di-reuse setiap kali init() dipanggil untuk block yang sama.
     private final FixtureDef cachedFixtureDef;
 
     public Block() {
         cachedFixtureDef = new FixtureDef();
-        cachedFixtureDef.density = 10.0f;
-        cachedFixtureDef.friction = 3.0f;
-        cachedFixtureDef.restitution = 0.0f;
+        cachedFixtureDef.density     = DENSITY;
+        cachedFixtureDef.friction    = FRICTION;
+        cachedFixtureDef.restitution = RESTITUTION;
     }
 
-    /**
-     * Inisialisasi block dengan body Box2D BARU.
-     *
-     * DESAIN: Body selalu dibuat fresh di sini karena PlayingScreen
-     * menghancurkan body lama via world.destroyBody() sebelum memanggil
-     * blockPool.free(). Dengan demikian, body == null saat init() dipanggil
-     * dan tidak ada risiko referensi ke world yang sudah di-dispose.
-     */
     public void init(World world, float x, float y, Vector2[] tileOffsets, int ownerId) {
         this.ownerId = ownerId;
 
-        // Selalu buat body baru — body lama sudah dihancurkan di PlayingScreen
-        // sebelum block dikembalikan ke pool.
         BodyDef bodyDef = new BodyDef();
+        // WAJIB DynamicBody — bukan KinematicBody.
+        // KinematicBody tidak mendapat penetration correction dari StaticBody,
+        // sehingga blok menembus pulau tanpa hambatan.
+        // DynamicBody mendapat koreksi penuh; gravitasi dimatikan via gravityScale=0.
         bodyDef.type = BodyDef.BodyType.DynamicBody;
         bodyDef.position.set(x, y);
         body = world.createBody(bodyDef);
@@ -61,15 +61,19 @@ public class Block implements Pool.Poolable {
     public void setControlled(boolean controlled) {
         this.isControlled = controlled;
         if (controlled) {
-            body.setGravityScale(0);
+            body.setGravityScale(0f);
+            body.setLinearVelocity(0, 0);
+            body.setAngularVelocity(0);
             body.setFixedRotation(true);
-            body.setLinearDamping(0);
+            body.setLinearDamping(0f);
+            body.setAngularDamping(0f);
         } else {
             body.setLinearVelocity(0, 0);
-            body.setGravityScale(2.5f);
+            body.setAngularVelocity(0);
+            body.setGravityScale(RELEASED_GRAVITY_SCALE);
             body.setFixedRotation(false);
-            body.setAngularDamping(0.8f);
-            body.setLinearDamping(0.1f);
+            body.setAngularDamping(RELEASED_ANGULAR_DAMPING);
+            body.setLinearDamping(RELEASED_LINEAR_DAMPING);
         }
     }
 
@@ -77,15 +81,10 @@ public class Block implements Pool.Poolable {
         return isControlled;
     }
 
-    /**
-     * Dipanggil oleh Pool saat block dikembalikan via blockPool.free().
-     * Body sudah dihancurkan oleh PlayingScreen sebelum ini dipanggil,
-     * jadi cukup null-kan referensinya.
-     */
     @Override
     public void reset() {
-        body = null;
-        ownerId = -1;
+        body         = null;
+        ownerId      = -1;
         isControlled = false;
     }
 }

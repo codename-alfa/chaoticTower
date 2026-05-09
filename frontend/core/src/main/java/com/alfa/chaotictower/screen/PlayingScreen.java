@@ -23,7 +23,7 @@ public class PlayingScreen extends ScreenAdapter {
     private Box2DDebugRenderer debugRenderer;
     private OrthographicCamera camera;
     private FitViewport viewport;
-    private final Array<Block> activeBlocks = new Array<>();
+    private final Array<Block> activeBlocks   = new Array<>();
     private final Array<Block> blocksToSettle = new Array<>();
 
     private Player player1;
@@ -31,19 +31,19 @@ public class PlayingScreen extends ScreenAdapter {
 
     private OrthographicCamera hudCamera;
     private BitmapFont hudFont;
-
-    // StringBuilder di-cache agar tidak membuat String baru 60x/detik
     private final StringBuilder hudBuilder = new StringBuilder(32);
 
-    // Cache ukuran layar — hanya berubah saat resize()
     private int screenWidth;
     private int screenHeight;
-
-    // FIX BUG 1: Flag ini mencegah dua hal:
-    // (a) render() melanjutkan menggunakan world/debugRenderer yang sudah di-dispose
-    //     setelah game.setScreen() dipanggil dari dalam checkOutOfBounds()
-    // (b) transisi layar ganda jika dua blok jatuh di frame yang sama
     private boolean gameOver = false;
+
+    private static final float WORLD_GRAVITY           = -15f;
+    private static final int   STEP_VEL_ITERATIONS     = 10;
+    private static final int   STEP_POS_ITERATIONS     = 8;
+    private static final float LANDING_NORMAL_THRESHOLD = 0.4f;
+    private static final float MOVE_STEP               = 0.5f;
+    private static final float FALL_SPEED_NORMAL       = -2.5f;
+    private static final float FALL_SPEED_FAST         = -12.0f;
 
     public PlayingScreen(Main game) {
         this.game = game;
@@ -52,17 +52,17 @@ public class PlayingScreen extends ScreenAdapter {
     @Override
     public void show() {
         Box2D.init();
-        world = new World(new Vector2(0, -25f), true);
+        world = new World(new Vector2(0, WORLD_GRAVITY), true);
         debugRenderer = new Box2DDebugRenderer();
         camera = new OrthographicCamera();
         viewport = new FitViewport(40, 30, camera);
 
-        screenWidth = Gdx.graphics.getWidth();
+        screenWidth  = Gdx.graphics.getWidth();
         screenHeight = Gdx.graphics.getHeight();
 
         hudCamera = new OrthographicCamera();
         hudCamera.setToOrtho(false, screenWidth, screenHeight);
-        hudCamera.update(); // Dipanggil sekali di sini dan di resize() — tidak di render()
+        hudCamera.update();
 
         hudFont = GameAssetManager.getInstance().manager.get(GameAssetManager.FONT_HUD, BitmapFont.class);
 
@@ -80,31 +80,63 @@ public class PlayingScreen extends ScreenAdapter {
         world.setContactListener(new ContactListener() {
             @Override
             public void beginContact(Contact contact) {
+                checkLanding(contact);
+            }
+
+            @Override
+            public void endContact(Contact contact) {}
+
+            @Override
+            public void preSolve(Contact contact, Manifold oldManifold) {
                 Fixture fa = contact.getFixtureA();
                 Fixture fb = contact.getFixtureB();
-                checkLandingFast(fa, fb);
+                if (isFixtureControlled(fa) || isFixtureControlled(fb)) {
+                    Vector2 normal = contact.getWorldManifold().getNormal();
+                    if (Math.abs(normal.y) < 0.5f) {
+                        contact.setFriction(0f);
+                    } else {
+                        contact.setFriction(1.0f);
+                    }
+                }
             }
-            @Override public void endContact(Contact contact) {}
-            @Override public void preSolve(Contact contact, Manifold oldManifold) {}
-            @Override public void postSolve(Contact contact, ContactImpulse impulse) {}
+
+            @Override
+            public void postSolve(Contact contact, ContactImpulse impulse) {}
         });
     }
 
     private void createEnvironment() {
-        BodyDef groundDef = new BodyDef();
-        groundDef.position.set(20, 1);
-        Body groundBody = world.createBody(groundDef);
-        PolygonShape groundShape = new PolygonShape();
-        groundShape.setAsBox(20, 1);
-        groundBody.createFixture(groundShape, 0);
-        groundShape.dispose();
+        BodyDef p1Def = new BodyDef();
+        p1Def.position.set(10, 2);
+        Body p1Body = world.createBody(p1Def);
+        PolygonShape p1Shape = new PolygonShape();
+        p1Shape.setAsBox(2.5f, 1f);
+        FixtureDef p1FixtureDef = new FixtureDef();
+        p1FixtureDef.shape = p1Shape;
+        p1FixtureDef.friction = 1.0f;
+        p1Body.createFixture(p1FixtureDef);
+        p1Shape.dispose();
+
+        BodyDef p2Def = new BodyDef();
+        p2Def.position.set(30, 2);
+        Body p2Body = world.createBody(p2Def);
+        PolygonShape p2Shape = new PolygonShape();
+        p2Shape.setAsBox(2.5f, 1f);
+        FixtureDef p2FixtureDef = new FixtureDef();
+        p2FixtureDef.shape = p2Shape;
+        p2FixtureDef.friction = 1.0f;
+        p2Body.createFixture(p2FixtureDef);
+        p2Shape.dispose();
 
         BodyDef dividerDef = new BodyDef();
         dividerDef.position.set(20, 15);
         Body dividerBody = world.createBody(dividerDef);
         PolygonShape dividerShape = new PolygonShape();
-        dividerShape.setAsBox(0.2f, 15);
-        dividerBody.createFixture(dividerShape, 0);
+        dividerShape.setAsBox(0.1f, 15);
+        FixtureDef dividerFixtureDef = new FixtureDef();
+        dividerFixtureDef.shape = dividerShape;
+        dividerFixtureDef.friction = 0f;
+        dividerBody.createFixture(dividerFixtureDef);
         dividerShape.dispose();
     }
 
@@ -113,18 +145,55 @@ public class PlayingScreen extends ScreenAdapter {
         activeBlocks.add(player.getCurrentBlock());
     }
 
-    private void checkLandingFast(Fixture fa, Fixture fb) {
-        checkPlayerLandingFast(player1, fa, fb);
-        checkPlayerLandingFast(player2, fa, fb);
+    private boolean isFixtureControlled(Fixture fixture) {
+        Block b1 = player1.getCurrentBlock();
+        Block b2 = player2.getCurrentBlock();
+        return (b1 != null && fixture.getBody() == b1.body) ||
+            (b2 != null && fixture.getBody() == b2.body);
     }
 
-    private void checkPlayerLandingFast(Player player, Fixture fa, Fixture fb) {
-        Block block = player.getCurrentBlock();
-        // Guard cepat: hanya proses jika block sedang dikontrol
-        if (block == null || !block.isControlled()) return;
+    private void checkLanding(Contact contact) {
+        Fixture fa = contact.getFixtureA();
+        Fixture fb = contact.getFixtureB();
+        if (!isFixtureControlled(fa) && !isFixtureControlled(fb)) return;
 
-        Body blockBody = block.body;
-        if (fa.getBody() == blockBody || fb.getBody() == blockBody) {
+        Vector2 normal = contact.getWorldManifold().getNormal();
+        checkPlayerLanding(player1, fa, fb, normal);
+        checkPlayerLanding(player2, fa, fb, normal);
+    }
+
+    private void checkPlayerLanding(Player player, Fixture fa, Fixture fb, Vector2 normal) {
+        Block block = player.getCurrentBlock();
+        if (block == null) return;
+
+        boolean isFaPlayer = (fa.getBody() == block.body);
+        boolean isFbPlayer = (fb.getBody() == block.body);
+        if (!isFaPlayer && !isFbPlayer) return;
+
+        // ── FIX UTAMA ─────────────────────────────────────────────────────────
+        // Box2D mendefinisikan WorldManifold.getNormal() mengarah DARI A KE B.
+        //
+        // Kita ingin tahu: apakah blok berada DI ATAS permukaan kontak?
+        // Jika ya, komponen Y dari vektor "menuju blok" harus positif (ke atas).
+        //
+        // • Blok = fixture A (isFaPlayer):
+        //     normal mengarah A→B = dari blok ke island = ke bawah → normal.y < 0
+        //     "menuju blok" = kebalikannya = -normal.y → positif ✓
+        //
+        // • Blok = fixture B (isFbPlayer):
+        //     normal mengarah A→B = dari island ke blok = ke atas → normal.y > 0
+        //     "menuju blok" = normal.y langsung → positif ✓
+        //
+        // KODE LAMA (salah): isFaPlayer ? normal.y : -normal.y
+        //   → kedua kasus menghasilkan nilai NEGATIF → threshold tidak pernah terpenuhi
+        //   → blok tidak pernah settle meski sudah mendarat
+        //
+        // KODE BARU (benar): isFaPlayer ? -normal.y : normal.y
+        //   → kedua kasus menghasilkan nilai POSITIF ≈ 1.0 → threshold terpenuhi ✓
+        // ─────────────────────────────────────────────────────────────────────
+        float ny = isFaPlayer ? -normal.y : normal.y;
+
+        if (ny > LANDING_NORMAL_THRESHOLD) {
             if (!blocksToSettle.contains(block, true)) {
                 blocksToSettle.add(block);
             }
@@ -133,28 +202,16 @@ public class PlayingScreen extends ScreenAdapter {
 
     @Override
     public void render(float delta) {
-        // FIX BUG 1 (bagian awal): Jika game sudah selesai (dari frame sebelumnya),
-        // hentikan render segera. LibGDX memanggil render() satu frame lagi
-        // setelah setScreen() sebelum benar-benar pindah layar.
         if (gameOver) return;
 
         Gdx.gl.glClearColor(0.1f, 0.4f, 0.1f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         handleInput();
-        world.step(1 / 60f, 10, 8);
+        world.step(1 / 60f, STEP_VEL_ITERATIONS, STEP_POS_ITERATIONS);
         processSettleQueue();
         checkOutOfBounds();
 
-        // FIX BUG 1 (bagian kritis): Guard INI yang menyelamatkan.
-        //
-        // Skenario crash tanpa guard ini:
-        // 1. checkOutOfBounds() mendeteksi lives <= 0
-        // 2. game.setScreen(new GameOverScreen()) dipanggil
-        // 3. LibGDX langsung memanggil hide() → world.dispose() + debugRenderer.dispose()
-        // 4. Eksekusi kembali ke render() setelah checkOutOfBounds() return
-        // 5. TANPA GUARD: debugRenderer.render(world, ...) → CRASH karena keduanya disposed
-        // 6. DENGAN GUARD: langsung return, tidak ada yang menyentuh world/debugRenderer
         if (gameOver) return;
 
         updatePlayer(player1, delta);
@@ -163,7 +220,6 @@ public class PlayingScreen extends ScreenAdapter {
         viewport.apply();
         debugRenderer.render(world, camera.combined);
 
-        // hudCamera tidak perlu di-update setiap frame — sudah dilakukan di show()/resize()
         game.batch.setProjectionMatrix(hudCamera.combined);
         game.batch.begin();
         drawHud();
@@ -225,19 +281,10 @@ public class PlayingScreen extends ScreenAdapter {
         }
     }
 
-    /**
-     * Cara BENAR untuk melepaskan block kembali ke pool:
-     * 1. Hancurkan body di world (agar tidak accumulate di Box2D)
-     * 2. null-kan referensi body (Block.reset() juga null-kan, tapi eksplisit lebih aman)
-     * 3. Kembalikan Java object ke pool untuk di-reuse
-     *
-     * Pola ini memutus ikatan antara Box2D body dan Object Pool,
-     * sehingga aman lintas sesi game.
-     */
     private void destroyAndFreeBlock(Block block) {
         if (block.body != null && world != null) {
             world.destroyBody(block.body);
-            block.body = null; // Hindari double-free jika reset() dipanggil ulang
+            block.body = null;
         }
         BlockFactory.getInstance().freeBlock(block);
     }
@@ -245,7 +292,7 @@ public class PlayingScreen extends ScreenAdapter {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
-        screenWidth = width;
+        screenWidth  = width;
         screenHeight = height;
         hudCamera.setToOrtho(false, width, height);
         hudCamera.update();
@@ -260,14 +307,14 @@ public class PlayingScreen extends ScreenAdapter {
         Block block = player.getCurrentBlock();
         if (block == null || !block.isControlled()) return;
 
-        float currentFallSpeed = Gdx.input.isKeyPressed(down) ? -10.0f : -2.0f;
+        float currentFallSpeed = Gdx.input.isKeyPressed(down) ? FALL_SPEED_FAST : FALL_SPEED_NORMAL;
         block.body.setLinearVelocity(0, currentFallSpeed);
 
         Vector2 pos = block.body.getPosition();
         if (Gdx.input.isKeyJustPressed(left)) {
-            block.body.setTransform(pos.x - 1.0f, pos.y, block.body.getAngle());
+            block.body.setTransform(pos.x - MOVE_STEP, pos.y, block.body.getAngle());
         } else if (Gdx.input.isKeyJustPressed(right)) {
-            block.body.setTransform(pos.x + 1.0f, pos.y, block.body.getAngle());
+            block.body.setTransform(pos.x + MOVE_STEP, pos.y, block.body.getAngle());
         }
         if (Gdx.input.isKeyJustPressed(rotate)) {
             block.body.setTransform(pos.x, pos.y, block.body.getAngle() + (float) Math.PI / 2);
@@ -276,16 +323,13 @@ public class PlayingScreen extends ScreenAdapter {
 
     @Override
     public void hide() {
-        // Bersihkan antrean settle terlebih dahulu (tidak perlu diproses)
         blocksToSettle.clear();
 
-        // Hancurkan semua body dan kembalikan block ke pool
         for (int i = 0; i < activeBlocks.size; i++) {
             destroyAndFreeBlock(activeBlocks.get(i));
         }
         activeBlocks.clear();
 
-        // Dispose resource Box2D — setelah ini world tidak boleh diakses lagi
         if (world != null) {
             world.dispose();
             world = null;
@@ -295,6 +339,6 @@ public class PlayingScreen extends ScreenAdapter {
             debugRenderer = null;
         }
 
-        gameOver = false; // Reset untuk sesi berikutnya jika PlayingScreen di-reuse
+        gameOver = false;
     }
 }
