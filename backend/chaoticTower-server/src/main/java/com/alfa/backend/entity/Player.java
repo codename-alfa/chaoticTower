@@ -2,6 +2,7 @@ package com.alfa.backend.entity;
 
 import jakarta.persistence.*;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "players")
@@ -13,9 +14,11 @@ public class Player {
     @Column(nullable = false, unique = true)
     private String username;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "player", cascade = CascadeType.ALL)
     private List<Leaderboard> leaderboards;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "player", cascade = CascadeType.ALL)
     private List<PlayerAchievement> playerAchievements;
 

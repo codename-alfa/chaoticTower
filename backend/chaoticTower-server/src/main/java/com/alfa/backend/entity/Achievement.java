@@ -2,6 +2,7 @@ package com.alfa.backend.entity;
 
 import jakarta.persistence.*;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "achievements")
@@ -16,6 +17,7 @@ public class Achievement {
     @Column(nullable = false)
     private String description;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "achievement", cascade = CascadeType.ALL)
     private List<PlayerAchievement> playerAchievements;
 

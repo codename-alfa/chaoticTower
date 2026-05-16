@@ -38,6 +38,9 @@ public class PlayingScreen extends ScreenAdapter {
     private boolean gameOver = false;
     private Long loggedInPlayerId;
 
+    private int currentScore = 0;
+    private double elapsedTime = 0.0;
+
     private static final float WORLD_GRAVITY           = -15f;
     private static final int   STEP_VEL_ITERATIONS     = 10;
     private static final int   STEP_POS_ITERATIONS     = 8;
@@ -195,27 +198,6 @@ public class PlayingScreen extends ScreenAdapter {
         boolean isFbPlayer = (fb.getBody() == block.body);
         if (!isFaPlayer && !isFbPlayer) return;
 
-        // ── FIX UTAMA ─────────────────────────────────────────────────────────
-        // Box2D mendefinisikan WorldManifold.getNormal() mengarah DARI A KE B.
-        //
-        // Kita ingin tahu: apakah blok berada DI ATAS permukaan kontak?
-        // Jika ya, komponen Y dari vektor "menuju blok" harus positif (ke atas).
-        //
-        // • Blok = fixture A (isFaPlayer):
-        //     normal mengarah A→B = dari blok ke island = ke bawah → normal.y < 0
-        //     "menuju blok" = kebalikannya = -normal.y → positif ✓
-        //
-        // • Blok = fixture B (isFbPlayer):
-        //     normal mengarah A→B = dari island ke blok = ke atas → normal.y > 0
-        //     "menuju blok" = normal.y langsung → positif ✓
-        //
-        // KODE LAMA (salah): isFaPlayer ? normal.y : -normal.y
-        //   → kedua kasus menghasilkan nilai NEGATIF → threshold tidak pernah terpenuhi
-        //   → blok tidak pernah settle meski sudah mendarat
-        //
-        // KODE BARU (benar): isFaPlayer ? -normal.y : normal.y
-        //   → kedua kasus menghasilkan nilai POSITIF ≈ 1.0 → threshold terpenuhi ✓
-        // ─────────────────────────────────────────────────────────────────────
         float ny = isFaPlayer ? -normal.y : normal.y;
 
         if (ny > LANDING_NORMAL_THRESHOLD) {
@@ -228,6 +210,8 @@ public class PlayingScreen extends ScreenAdapter {
     @Override
     public void render(float delta) {
         if (gameOver) return;
+
+        elapsedTime += delta;
 
         Gdx.gl.glClearColor(0.1f, 0.4f, 0.1f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -256,6 +240,7 @@ public class PlayingScreen extends ScreenAdapter {
         for (int i = 0; i < blocksToSettle.size; i++) {
             Block block = blocksToSettle.get(i);
             block.setControlled(false);
+            currentScore += 10;
             if (player1.getCurrentBlock() == block) player1.clearCurrentBlock();
             if (player2.getCurrentBlock() == block) player2.clearCurrentBlock();
         }
@@ -263,6 +248,10 @@ public class PlayingScreen extends ScreenAdapter {
     }
 
     private void drawHud() {
+        hudBuilder.setLength(0);
+        hudBuilder.append("Score: ").append(currentScore);
+        hudFont.draw(game.batch, hudBuilder, screenWidth / 2f - 50, screenHeight - 20);
+
         hudBuilder.setLength(0);
         hudBuilder.append("P1 Lives: ").append(player1.getLives());
         hudFont.draw(game.batch, hudBuilder, 50, screenHeight - 50);
@@ -295,12 +284,12 @@ public class PlayingScreen extends ScreenAdapter {
 
                 if (player1.getLives() <= 0 || player2.getLives() <= 0) {
                     gameOver = true;
-                    game.setScreen(new GameOverScreen(game));
+                    game.setScreen(new GameOverScreen(game, loggedInPlayerId, currentScore, elapsedTime));
                     return;
                 }
             } else if (!block.isControlled() && block.body.getPosition().y >= 26.5f) {
                 gameOver = true;
-                game.setScreen(new GameOverScreen(game));
+                game.setScreen(new GameOverScreen(game, loggedInPlayerId, currentScore, elapsedTime));
                 return;
             }
         }
@@ -363,8 +352,6 @@ public class PlayingScreen extends ScreenAdapter {
             debugRenderer.dispose();
             debugRenderer = null;
         }
-
-        gameOver = false;
     }
     public void setPlayerId(Long id) {
         this.loggedInPlayerId = id;
