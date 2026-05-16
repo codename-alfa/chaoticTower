@@ -36,6 +36,7 @@ public class PlayingScreen extends ScreenAdapter {
     private int screenWidth;
     private int screenHeight;
     private boolean gameOver = false;
+    private Long loggedInPlayerId;
 
     private static final float WORLD_GRAVITY           = -15f;
     private static final int   STEP_VEL_ITERATIONS     = 10;
@@ -138,6 +139,30 @@ public class PlayingScreen extends ScreenAdapter {
         dividerFixtureDef.friction = 0f;
         dividerBody.createFixture(dividerFixtureDef);
         dividerShape.dispose();
+
+        BodyDef wallDef1 = new BodyDef();
+        wallDef1.position.set(2.5f, 15);
+        Body wallBody1 = world.createBody(wallDef1);
+        PolygonShape wallShape = new PolygonShape();
+        wallShape.setAsBox(0.1f, 15);
+        wallBody1.createFixture(wallShape, 0f);
+
+        BodyDef wallDef2 = new BodyDef();
+        wallDef2.position.set(17.5f, 15);
+        Body wallBody2 = world.createBody(wallDef2);
+        wallBody2.createFixture(wallShape, 0f);
+
+        BodyDef wallDef3 = new BodyDef();
+        wallDef3.position.set(22.5f, 15);
+        Body wallBody3 = world.createBody(wallDef3);
+        wallBody3.createFixture(wallShape, 0f);
+
+        BodyDef wallDef4 = new BodyDef();
+        wallDef4.position.set(37.5f, 15);
+        Body wallBody4 = world.createBody(wallDef4);
+        wallBody4.createFixture(wallShape, 0f);
+
+        wallShape.dispose();
     }
 
     private void spawnForPlayer(Player player) {
@@ -340,5 +365,11 @@ public class PlayingScreen extends ScreenAdapter {
         }
 
         gameOver = false;
+    }
+    public void setPlayerId(Long id) {
+        this.loggedInPlayerId = id;
+    }
+    public Long getPlayerId() {
+        return loggedInPlayerId;
     }
 }

@@ -5,7 +5,9 @@ import com.alfa.backend.entity.Player;
 import com.alfa.backend.repository.LeaderboardRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class LeaderboardService {
@@ -23,6 +25,17 @@ public class LeaderboardService {
         Player player = playerService.getPlayerById(playerId);
         if (player == null) {
             throw new RuntimeException("Player not found");
+        }
+
+        Optional<Leaderboard> existing = leaderboardRepository.findByPlayer_IdAndGameMode(playerId, gameMode);
+        if (existing.isPresent()) {
+            Leaderboard entry = existing.get();
+            if (score > entry.getScore()) {
+                entry.setScore(score);
+                entry.setTimeRecord(timeRecord);
+                return leaderboardRepository.save(entry);
+            }
+            return entry;
         }
 
         Leaderboard entry = new Leaderboard();
