@@ -10,7 +10,7 @@ import com.badlogic.gdx.utils.Pool;
 
 public class Block implements Pool.Poolable {
 
-    private static final float TILE_SIZE = 0.5f;
+    public static final float TILE_SIZE = 0.5f;
     private static final float HALF_TILE = (TILE_SIZE / 2f) - 0.01f;
 
     private static final float DENSITY              = 1.5f;
@@ -24,6 +24,9 @@ public class Block implements Pool.Poolable {
     public Body body;
     public int ownerId;
     private boolean isControlled;
+    private int tetrominoType;
+    /** Tile center positions in local body space (offset * TILE_SIZE). */
+    private Vector2[] localTilePositions;
 
     private final FixtureDef cachedFixtureDef;
 
@@ -34,8 +37,15 @@ public class Block implements Pool.Poolable {
         cachedFixtureDef.restitution = RESTITUTION;
     }
 
-    public void init(World world, float x, float y, Vector2[] tileOffsets, int ownerId) {
+    public void init(World world, float x, float y, Vector2[] tileOffsets, int ownerId, int tetrominoType) {
         this.ownerId = ownerId;
+        this.tetrominoType = tetrominoType;
+
+        // Store scaled tile positions for rendering
+        localTilePositions = new Vector2[tileOffsets.length];
+        for (int i = 0; i < tileOffsets.length; i++) {
+            localTilePositions[i] = new Vector2(tileOffsets[i]).scl(TILE_SIZE);
+        }
 
         BodyDef bodyDef = new BodyDef();
         // WAJIB DynamicBody — bukan KinematicBody.
@@ -81,10 +91,20 @@ public class Block implements Pool.Poolable {
         return isControlled;
     }
 
+    public int getTetrominoType() {
+        return tetrominoType;
+    }
+
+    public Vector2[] getLocalTilePositions() {
+        return localTilePositions;
+    }
+
     @Override
     public void reset() {
-        body         = null;
-        ownerId      = -1;
-        isControlled = false;
+        body              = null;
+        ownerId           = -1;
+        isControlled      = false;
+        tetrominoType     = 0;
+        localTilePositions = null;
     }
 }

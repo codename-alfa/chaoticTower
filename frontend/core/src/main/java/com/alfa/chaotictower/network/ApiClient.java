@@ -25,11 +25,11 @@ public class ApiClient {
         sendRequest(request, callback);
     }
 
-    public static void submitScore(Long playerId, String gameMode, int score, double timeRecord, ApiCallback callback) {
+    public static void submitScore(Long playerId, String gameMode, int score, double timeRecord, double maxHeight, ApiCallback callback) {
         HttpRequestBuilder requestBuilder = new HttpRequestBuilder();
         Net.HttpRequest request = requestBuilder.newRequest()
             .method(Net.HttpMethods.POST)
-            .url(BASE_URL + "/leaderboard/submit?playerId=" + playerId + "&gameMode=" + gameMode + "&score=" + score + "&timeRecord=" + timeRecord)
+            .url(BASE_URL + "/leaderboard/submit?playerId=" + playerId + "&gameMode=" + gameMode + "&score=" + score + "&timeRecord=" + timeRecord + "&maxHeight=" + maxHeight)
             .build();
 
         sendRequest(request, callback);

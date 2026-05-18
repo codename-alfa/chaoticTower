@@ -64,9 +64,10 @@ public class BlockFactory {
 
     public Block spawnBlock(World world, float x, float y, int ownerId) {
         Block block = blockPool.obtain();
+        int typeIndex = random.nextInt(shapeDefinitions.size);
         // Offset di-pass by reference (read-only di Block.init()) — aman, tanpa alokasi
-        Vector2[] offsets = shapeDefinitions.get(random.nextInt(shapeDefinitions.size));
-        block.init(world, x, y, offsets, ownerId);
+        Vector2[] offsets = shapeDefinitions.get(typeIndex);
+        block.init(world, x, y, offsets, ownerId, typeIndex);
         return block;
     }
 

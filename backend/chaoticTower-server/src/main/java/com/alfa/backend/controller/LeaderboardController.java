@@ -24,8 +24,9 @@ public class LeaderboardController {
             @RequestParam Long playerId,
             @RequestParam String gameMode,
             @RequestParam Integer score,
-            @RequestParam Double timeRecord) {
-        Leaderboard entry = leaderboardService.submitScore(playerId, gameMode, score, timeRecord);
+            @RequestParam Double timeRecord,
+            @RequestParam(required = false, defaultValue = "0.0") Double maxHeight) {
+        Leaderboard entry = leaderboardService.submitScore(playerId, gameMode, score, timeRecord, maxHeight);
         return ResponseEntity.ok(entry);
     }
 

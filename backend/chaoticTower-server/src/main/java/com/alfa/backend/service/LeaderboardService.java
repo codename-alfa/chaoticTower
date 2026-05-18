@@ -21,7 +21,7 @@ public class LeaderboardService {
         this.playerService = playerService;
     }
 
-    public Leaderboard submitScore(Long playerId, String gameMode, Integer score, Double timeRecord) {
+    public Leaderboard submitScore(Long playerId, String gameMode, Integer score, Double timeRecord, Double maxHeight) {
         Player player = playerService.getPlayerById(playerId);
         if (player == null) {
             throw new RuntimeException("Player not found");
@@ -33,6 +33,7 @@ public class LeaderboardService {
             if (score > entry.getScore()) {
                 entry.setScore(score);
                 entry.setTimeRecord(timeRecord);
+                entry.setMaxHeight(maxHeight);
                 return leaderboardRepository.save(entry);
             }
             return entry;
@@ -43,6 +44,7 @@ public class LeaderboardService {
         entry.setGameMode(gameMode);
         entry.setScore(score);
         entry.setTimeRecord(timeRecord);
+        entry.setMaxHeight(maxHeight);
 
         return leaderboardRepository.save(entry);
     }

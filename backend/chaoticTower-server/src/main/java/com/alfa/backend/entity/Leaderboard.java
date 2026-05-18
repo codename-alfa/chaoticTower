@@ -18,6 +18,7 @@ public class Leaderboard {
 
     private Integer score;
     private Double timeRecord;
+    private Double maxHeight;
 
     public Leaderboard() {}
 
@@ -31,4 +32,6 @@ public class Leaderboard {
     public void setScore(Integer score) { this.score = score; }
     public Double getTimeRecord() { return timeRecord; }
     public void setTimeRecord(Double timeRecord) { this.timeRecord = timeRecord; }
+    public Double getMaxHeight() { return maxHeight; }
+    public void setMaxHeight(Double maxHeight) { this.maxHeight = maxHeight; }
 }
