@@ -23,6 +23,15 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.alfa.chaotictower.strategy.PuzzleStrategy;
+import com.alfa.chaotictower.magic.Spell;
+import com.alfa.chaotictower.magic.SpellManager;
+import com.alfa.chaotictower.magic.light.CementSpell;
+import com.alfa.chaotictower.magic.light.IvySpell;
+import com.alfa.chaotictower.magic.light.LightningSpell;
+import com.alfa.chaotictower.magic.dark.FrostSpell;
+import com.alfa.chaotictower.magic.dark.WeightSpell;
+import com.alfa.chaotictower.magic.dark.SpeedUpSpell;
 
 public class PlayingScreen extends ScreenAdapter {
 
@@ -53,7 +62,20 @@ public class PlayingScreen extends ScreenAdapter {
     private Long loggedInPlayerId;
     private double elapsedTime = 0.0;
     private BitmapFont titleFont;
+
+    // ─── Countdown ──────────────────────────────────────────────────
+    private static final float COUNTDOWN_DURATION = 3.0f;
+    private float countdownTimer = COUNTDOWN_DURATION;
+    private boolean countdownDone = false;
     private final GlyphLayout glyphLayout = new GlyphLayout();
+
+    // ─── Magic Spell System ──────────────────────────────────────
+    private SpellManager spellManager;
+    private static final int[] SPELL_CAST_KEYS = { Input.Keys.E, Input.Keys.NUMPAD_0 };
+
+    // ─── Camera Follow ───────────────────────────────────────────
+    private static final float CAMERA_LERP_SPEED = 2.5f;
+    private static final float MIN_CAMERA_Y = 15f; // half of viewport height 30
 
     // ─── Physics constants ──────────────────────────────────────────
     private static final float WORLD_GRAVITY           = -15f;
@@ -152,9 +174,21 @@ public class PlayingScreen extends ScreenAdapter {
         createEnvironment();
         setupContactListener();
 
-        for (Player p : players) {
-            spawnForPlayer(p);
-        }
+        // Reset the 7-bag randomizer for a fresh game
+        BlockFactory.getInstance().resetBags();
+
+        // Initialize spell system
+        spellManager = new SpellManager(playerCount);
+        spellManager.registerLightSpell(new CementSpell());
+        spellManager.registerLightSpell(new IvySpell());
+        spellManager.registerLightSpell(new LightningSpell());
+        spellManager.registerDarkSpell(new FrostSpell());
+        spellManager.registerDarkSpell(new WeightSpell());
+        spellManager.registerDarkSpell(new SpeedUpSpell());
+
+        // Don't spawn blocks yet — wait for countdown to finish
+        countdownTimer = COUNTDOWN_DURATION;
+        countdownDone = false;
     }
 
     // ─── Contact Listener ───────────────────────────────────────────
@@ -251,12 +285,24 @@ public class PlayingScreen extends ScreenAdapter {
     public void render(float delta) {
         if (gameOver) return;
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+        // ── Countdown phase ─────────────────────────────────────────
+        if (!countdownDone) {
+            countdownTimer -= delta;
+            if (countdownTimer <= 0) {
+                countdownDone = true;
+                // Spawn first blocks now that countdown is done
+                for (Player p : players) {
+                    spawnForPlayer(p);
+                }
+            }
+        }
+
+        if (countdownDone && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             paused = !paused;
             pauseSelectedIndex = 0;
         }
 
-        if (!paused) {
+        if (countdownDone && !paused) {
             elapsedTime += delta;
 
             for (int i = 0; i < players.length; i++) inputHandlers[i].handleInput(players[i]);
@@ -275,11 +321,24 @@ public class PlayingScreen extends ScreenAdapter {
             }
 
             for (Player p : players) updatePlayer(p, delta);
+
+            // Update spell system
+            float[] spellMh = getMaxHeightsArray();
+            spellManager.update(delta, players, spellMh, world, activeBlocks);
+
+            // Handle spell cast keys
+            for (int i = 0; i < players.length; i++) {
+                if (i < SPELL_CAST_KEYS.length && Gdx.input.isKeyJustPressed(SPELL_CAST_KEYS[i])) {
+                    spellManager.castSpell(i, players, world, activeBlocks);
+                }
+            }
         }
 
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        // Camera follow: smooth-lerp upward to track the tallest tower
+        updateCameraFollow(delta);
         viewport.apply();
 
         shapeRenderer.setProjectionMatrix(camera.combined);
@@ -296,8 +355,15 @@ public class PlayingScreen extends ScreenAdapter {
 
         game.batch.setProjectionMatrix(hudCamera.combined);
         game.batch.begin();
-        drawHud();
+        if (countdownDone) {
+            drawHud();
+        }
         game.batch.end();
+
+        // ── Countdown overlay ───────────────────────────────────────
+        if (!countdownDone) {
+            drawCountdownOverlay();
+        }
 
         if (paused) {
             drawPauseOverlay();
@@ -467,6 +533,15 @@ public class PlayingScreen extends ScreenAdapter {
         float cos = MathUtils.cos(angle), sin = MathUtils.sin(angle);
         float deg = angle * MathUtils.radiansToDegrees;
 
+        // Spell visual overrides
+        if (block.isCemented()) {
+            base = new Color(0.6f, 0.6f, 0.6f, 1f); // grey for cement
+        } else if (block.isIvied()) {
+            base = new Color(
+                base.r * 0.5f, Math.min(1f, base.g * 0.8f + 0.4f), base.b * 0.3f, 1f
+            ); // green tint for ivy
+        }
+
         // Controlled block pulses slightly
         if (block.isControlled()) {
             float pulse = 0.12f * (float) Math.sin(elapsedTime * 6.0);
@@ -526,6 +601,31 @@ public class PlayingScreen extends ScreenAdapter {
         float th = -1;
         if (strategy instanceof RaceStrategy) th = ((RaceStrategy) strategy).getTargetHeight();
         else if (strategy instanceof TimeAttackStrategy) th = ((TimeAttackStrategy) strategy).getTargetHeight();
+
+        // Puzzle mode: draw laser line per player (adjusted for penalties)
+        if (strategy instanceof PuzzleStrategy) {
+            PuzzleStrategy puzzle = (PuzzleStrategy) strategy;
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+            float dashAlpha = 0.55f + 0.2f * (float) Math.sin(elapsedTime * 4.0);
+
+            for (int i = 0; i < players.length; i++) {
+                float laserH = puzzle.getEffectiveLaserHeight(i);
+                float worldY = PEDESTAL_Y + PEDESTAL_HALF + laserH;
+
+                // Laser line — red/orange
+                tempColor.set(1f, 0.3f, 0.1f, dashAlpha);
+                shapeRenderer.setColor(tempColor);
+                if (playerCount == 1) {
+                    shapeRenderer.rect(2.5f, worldY - 0.06f, 15f, 0.12f);
+                } else {
+                    float wallX = (i == 0) ? 2.5f : 22.5f;
+                    shapeRenderer.rect(wallX, worldY - 0.06f, 15f, 0.12f);
+                }
+            }
+            shapeRenderer.end();
+            return;
+        }
+
         if (th <= 0) return;
 
         float worldY = PEDESTAL_Y + PEDESTAL_HALF + th;
@@ -567,6 +667,9 @@ public class PlayingScreen extends ScreenAdapter {
             drawPlayerHud(players[0], 40, screenHeight - 20);
             drawPlayerHud(players[1], screenWidth - 320, screenHeight - 20);
         }
+
+        // Next block preview (switches between batch and shape renderer internally)
+        drawNextBlockPreview();
     }
 
     private void drawPlayerHud(Player p, float x, float y) {
@@ -583,6 +686,112 @@ public class PlayingScreen extends ScreenAdapter {
         hudBuilder.setLength(0);
         hudBuilder.append("Height: ").append(String.format("%.1f", p.getMaxHeight())).append("m");
         smallFont.draw(game.batch, hudBuilder, x, y - 66);
+
+        // Spell indicator
+        int playerIndex = p.getId() - 1;
+        Spell available = spellManager.getAvailableSpell(playerIndex);
+        if (available != null) {
+            hudBuilder.setLength(0);
+            String keyName = (playerIndex == 0) ? "[E]" : "[Num0]";
+            if (available.isLight()) {
+                smallFont.setColor(0.5f, 1f, 0.5f, 1f); // green for light
+            } else {
+                smallFont.setColor(1f, 0.4f, 0.4f, 1f); // red for dark
+            }
+            hudBuilder.append(keyName).append(" ").append(available.getName());
+            smallFont.draw(game.batch, hudBuilder, x, y - 94);
+            smallFont.setColor(Color.WHITE);
+        }
+
+        // Active effects indicator
+        hudBuilder.setLength(0);
+        if (p.isFrosted()) hudBuilder.append("ICE ");
+        if (p.isSpedUp()) hudBuilder.append("FAST ");
+        if (p.isWeighted()) hudBuilder.append("HEAVY ");
+        if (hudBuilder.length() > 0) {
+            smallFont.setColor(0.6f, 0.8f, 1f, 1f);
+            smallFont.draw(game.batch, hudBuilder, x, y - 118);
+            smallFont.setColor(Color.WHITE);
+        }
+    }
+
+    // ─── Next Block Preview ─────────────────────────────────────────
+    private void drawNextBlockPreview() {
+        game.batch.end();
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapeRenderer.setProjectionMatrix(hudCamera.combined);
+
+        if (playerCount == 1) {
+            drawPreviewForPlayer(players[0], 40, screenHeight - 120);
+        } else {
+            drawPreviewForPlayer(players[0], 40, screenHeight - 120);
+            drawPreviewForPlayer(players[1], screenWidth - 200, screenHeight - 120);
+        }
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+        game.batch.begin();
+    }
+
+    private void drawPreviewForPlayer(Player p, float px, float py) {
+        BlockFactory factory = BlockFactory.getInstance();
+        int nextType = factory.peekNextType(p.getId());
+        Vector2[] offsets = factory.getShapeOffsets(nextType);
+        Color color = BLOCK_COLORS[nextType];
+
+        // Label
+        game.batch.begin();
+        smallFont.draw(game.batch, "NEXT", px, py + 25);
+        game.batch.end();
+
+        // Draw preview tiles at a fixed pixel scale
+        float tilePixel = 22f;  // preview tile size in pixels
+        float centerX = px + 55;
+        float centerY = py - 40;
+
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(color);
+        for (Vector2 off : offsets) {
+            float tx = centerX + off.x * tilePixel;
+            float ty = centerY + off.y * tilePixel;
+            shapeRenderer.rect(tx - tilePixel / 2 + 1, ty - tilePixel / 2 + 1, tilePixel - 2, tilePixel - 2);
+        }
+        shapeRenderer.end();
+
+        // Outlines
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(0, 0, 0, 0.5f);
+        for (Vector2 off : offsets) {
+            float tx = centerX + off.x * tilePixel;
+            float ty = centerY + off.y * tilePixel;
+            shapeRenderer.rect(tx - tilePixel / 2 + 1, ty - tilePixel / 2 + 1, tilePixel - 2, tilePixel - 2);
+        }
+        shapeRenderer.end();
+    }
+
+    // ─── Countdown Overlay ──────────────────────────────────────────
+    private void drawCountdownOverlay() {
+        float cx = screenWidth / 2f;
+        float cy = screenHeight / 2f;
+
+        String text;
+        int sec = (int) Math.ceil(countdownTimer);
+        if (sec >= 3) text = "3";
+        else if (sec == 2) text = "2";
+        else if (sec == 1) text = "1";
+        else text = "GO!";
+
+        // Slight scale pulse
+        float pulse = 1.0f + 0.15f * (float) Math.sin(countdownTimer * 12.0);
+
+        game.batch.setProjectionMatrix(hudCamera.combined);
+        game.batch.begin();
+        titleFont.getData().setScale(pulse);
+        glyphLayout.setText(titleFont, text);
+        titleFont.draw(game.batch, text, cx - glyphLayout.width / 2, cy + glyphLayout.height / 2);
+        titleFont.getData().setScale(1f);
+        game.batch.end();
     }
 
     // ─── Settle queue ───────────────────────────────────────────────
@@ -592,10 +801,28 @@ public class PlayingScreen extends ScreenAdapter {
             Block block = blocksToSettle.get(i);
             block.setControlled(false);
             for (Player p : players) {
-                if (p.getCurrentBlock() == block) { p.addScore(10); p.clearCurrentBlock(); }
+                if (p.getCurrentBlock() == block) {
+                    p.addScore(10);
+                    p.clearCurrentBlock();
+                    // Puzzle mode: track blocks placed
+                    if (strategy instanceof PuzzleStrategy) {
+                        ((PuzzleStrategy) strategy).onBlockPlaced(p.getId() - 1);
+                    }
+                }
             }
         }
         blocksToSettle.clear();
+
+        // Puzzle mode: check if any tower exceeds the laser line
+        if (strategy instanceof PuzzleStrategy) {
+            PuzzleStrategy puzzle = (PuzzleStrategy) strategy;
+            for (int pi = 0; pi < players.length; pi++) {
+                if (puzzle.isAboveLaser(pi, players[pi].getMaxHeight())) {
+                    triggerGameOver();
+                    return;
+                }
+            }
+        }
     }
 
     private void updateMaxHeights() {
@@ -616,6 +843,24 @@ public class PlayingScreen extends ScreenAdapter {
         return arr;
     }
 
+    /**
+     * Smoothly lerps the camera upward to follow the tallest tower.
+     * The camera center Y is set so the pedestal stays visible at the bottom.
+     */
+    private void updateCameraFollow(float delta) {
+        float maxTowerWorldY = PEDESTAL_Y + PEDESTAL_HALF;
+        for (Player p : players) {
+            float towerTop = PEDESTAL_Y + PEDESTAL_HALF + p.getMaxHeight();
+            if (towerTop > maxTowerWorldY) maxTowerWorldY = towerTop;
+        }
+
+        // Target camera Y: keep the tower top in the upper portion of the viewport
+        // viewport height is 30, so camera center Y = towerTop - 10 (tower top at ~66% screen)
+        float targetY = Math.max(MIN_CAMERA_Y, maxTowerWorldY - 10f);
+        camera.position.y = MathUtils.lerp(camera.position.y, targetY, CAMERA_LERP_SPEED * delta);
+        camera.update();
+    }
+
     private void updatePlayer(Player p, float delta) {
         p.update(delta);
         if (p.canSpawn()) spawnForPlayer(p);
@@ -627,7 +872,14 @@ public class PlayingScreen extends ScreenAdapter {
             Block block = activeBlocks.get(i);
             if (block.body.getPosition().y < -2f) {
                 for (Player p : players) {
-                    if (block.ownerId == p.getId()) p.loseLife();
+                    if (block.ownerId == p.getId()) {
+                        // Puzzle mode: floor penalty instead of losing a life
+                        if (strategy instanceof PuzzleStrategy) {
+                            ((PuzzleStrategy) strategy).onBlockLost(p.getId() - 1);
+                        } else {
+                            p.loseLife();
+                        }
+                    }
                     if (block == p.getCurrentBlock()) p.clearCurrentBlock();
                 }
                 destroyAndFreeBlock(block);

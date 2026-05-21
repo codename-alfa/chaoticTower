@@ -107,6 +107,16 @@ public class Block implements Pool.Poolable {
         return localTilePositions;
     }
 
+    // ─── Spell visual flags ────────────────────────────────────────
+    private boolean cemented = false;
+    private boolean ivied    = false;
+
+    public boolean isCemented() { return cemented; }
+    public void setCemented(boolean cemented) { this.cemented = cemented; }
+
+    public boolean isIvied() { return ivied; }
+    public void setIvied(boolean ivied) { this.ivied = ivied; }
+
     @Override
     public void reset() {
         body              = null;
@@ -114,5 +124,7 @@ public class Block implements Pool.Poolable {
         isControlled      = false;
         tetrominoType     = 0;
         localTilePositions = null;
+        cemented          = false;
+        ivied             = false;
     }
 }

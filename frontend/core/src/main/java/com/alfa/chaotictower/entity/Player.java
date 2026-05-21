@@ -88,4 +88,18 @@ public class Player {
     public float getMaxHeight() {
         return maxHeight;
     }
+
+    // ─── Spell effect flags ────────────────────────────────────────
+    private boolean frosted = false;
+    private boolean weighted = false;
+    private boolean spedUp = false;
+
+    public boolean isFrosted() { return frosted; }
+    public void setFrosted(boolean frosted) { this.frosted = frosted; }
+
+    public boolean isWeighted() { return weighted; }
+    public void setWeighted(boolean weighted) { this.weighted = weighted; }
+
+    public boolean isSpedUp() { return spedUp; }
+    public void setSpedUp(boolean spedUp) { this.spedUp = spedUp; }
 }

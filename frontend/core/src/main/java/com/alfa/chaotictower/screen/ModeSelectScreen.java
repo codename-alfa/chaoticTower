@@ -27,15 +27,17 @@ public class ModeSelectScreen extends ScreenAdapter {
     private boolean transitioning = false;
     private float time = 0;
 
-    private static final String[] SP_MODES = {"Survival", "Time Attack"};
-    private static final String[] MP_MODES = {"Survival", "Race"};
+    private static final String[] SP_MODES = {"Survival", "Time Attack", "Puzzle"};
+    private static final String[] MP_MODES = {"Survival", "Race", "Puzzle"};
     private static final String[] SP_DESC = {
         "Build as high as you can with 3 lives!",
-        "Reach 20m height within 2 minutes!"
+        "Reach 20m height within 2 minutes!",
+        "Fit blocks below the laser line!"
     };
     private static final String[] MP_DESC = {
         "Last player standing wins!",
-        "First to reach the top wins!"
+        "First to reach the top wins!",
+        "Most blocks below the line wins!"
     };
 
     private static final Color BG_BOT = new Color(0.03f, 0.02f, 0.06f, 1);
@@ -205,6 +207,7 @@ public class ModeSelectScreen extends ScreenAdapter {
         switch (name) {
             case "Race": s = new RaceStrategy(); break;
             case "Time Attack": s = new TimeAttackStrategy(); break;
+            case "Puzzle": s = new PuzzleStrategy(playerCount); break;
             default: s = new SurvivalStrategy(); break;
         }
         PlayingScreen ps = new PlayingScreen(game, playerCount, s);
