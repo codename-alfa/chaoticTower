@@ -16,6 +16,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
@@ -48,8 +49,11 @@ public class PlayingScreen extends ScreenAdapter {
     private int screenWidth;
     private int screenHeight;
     private boolean gameOver = false;
+    private boolean paused = false;
     private Long loggedInPlayerId;
     private double elapsedTime = 0.0;
+    private BitmapFont titleFont;
+    private final GlyphLayout glyphLayout = new GlyphLayout();
 
     // ─── Physics constants ──────────────────────────────────────────
     private static final float WORLD_GRAVITY           = -15f;
@@ -118,6 +122,7 @@ public class PlayingScreen extends ScreenAdapter {
         hudFont   = assets.getFont(GameAssetManager.FONT_HUD);
         smallFont = assets.getFont(GameAssetManager.FONT_SMALL);
         menuFont  = assets.getFont(GameAssetManager.FONT_MENU);
+        titleFont = assets.getFont(GameAssetManager.FONT_TITLE);
 
         int lives = strategy.getInitialLives();
         if (playerCount == 1) {
@@ -237,27 +242,37 @@ public class PlayingScreen extends ScreenAdapter {
     @Override
     public void render(float delta) {
         if (gameOver) return;
-        elapsedTime += delta;
 
-        Gdx.gl.glClearColor(0, 0, 0, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-        for (int i = 0; i < players.length; i++) inputHandlers[i].handleInput(players[i]);
-
-        world.step(1 / 60f, STEP_VEL_ITERATIONS, STEP_POS_ITERATIONS);
-        processSettleQueue();
-        updateMaxHeights();
-        checkOutOfBounds();
-        if (gameOver) return;
-
-        float[] mh = getMaxHeightsArray();
-        if (strategy.checkWinCondition(players, elapsedTime, mh) ||
-            strategy.checkLoseCondition(players, elapsedTime)) {
-            triggerGameOver();
-            return;
+        // ── Pause toggle ──
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            paused = !paused;
         }
 
-        for (Player p : players) updatePlayer(p, delta);
+        // Only advance game logic when not paused
+        if (!paused) {
+            elapsedTime += delta;
+
+            for (int i = 0; i < players.length; i++) inputHandlers[i].handleInput(players[i]);
+
+            world.step(1 / 60f, STEP_VEL_ITERATIONS, STEP_POS_ITERATIONS);
+            processSettleQueue();
+            updateMaxHeights();
+            checkOutOfBounds();
+            if (gameOver) return;
+
+            float[] mh = getMaxHeightsArray();
+            if (strategy.checkWinCondition(players, elapsedTime, mh) ||
+                strategy.checkLoseCondition(players, elapsedTime)) {
+                triggerGameOver();
+                return;
+            }
+
+            for (Player p : players) updatePlayer(p, delta);
+        }
+
+        // ── Always render (even when paused) ──
+        Gdx.gl.glClearColor(0, 0, 0, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         viewport.apply();
 
@@ -278,6 +293,64 @@ public class PlayingScreen extends ScreenAdapter {
         game.batch.setProjectionMatrix(hudCamera.combined);
         game.batch.begin();
         drawHud();
+        game.batch.end();
+
+        // ── Pause overlay (drawn on top of everything) ──
+        if (paused) {
+            drawPauseOverlay();
+        }
+
+        // ── Pause menu input (after all rendering) ──
+        if (paused) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
+                paused = false;
+                gameOver = true;
+                game.setScreen(new ModeSelectScreen(game, loggedInPlayerId));
+            }
+        }
+    }
+
+    // ─── Pause overlay ──────────────────────────────────────────────
+    private void drawPauseOverlay() {
+        float w = screenWidth, h = screenHeight;
+        float cx = w / 2f;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        // Dark semi-transparent overlay
+        shapeRenderer.setProjectionMatrix(hudCamera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0, 0, 0, 0.65f);
+        shapeRenderer.rect(0, 0, w, h);
+
+        // Center panel
+        float panelW = 420, panelH = 260;
+        float px = cx - panelW / 2, py = h / 2f - panelH / 2;
+        shapeRenderer.setColor(0.08f, 0.08f, 0.16f, 0.92f);
+        shapeRenderer.rect(px, py, panelW, panelH);
+        // Accent top edge
+        shapeRenderer.setColor(0.45f, 0.35f, 0.85f, 0.9f);
+        shapeRenderer.rect(px, py + panelH - 4, panelW, 4);
+        shapeRenderer.end();
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        // Text
+        game.batch.setProjectionMatrix(hudCamera.combined);
+        game.batch.begin();
+
+        glyphLayout.setText(titleFont, "PAUSED");
+        titleFont.draw(game.batch, "PAUSED", cx - glyphLayout.width / 2, py + panelH - 40);
+
+        glyphLayout.setText(menuFont, "Press ESC to Resume");
+        menuFont.draw(game.batch, "Press ESC to Resume", cx - glyphLayout.width / 2, py + panelH - 120);
+
+        smallFont.setColor(0.8f, 0.5f, 0.5f, 1);
+        glyphLayout.setText(smallFont, "Press Q to Quit to Menu");
+        smallFont.draw(game.batch, "Press Q to Quit to Menu", cx - glyphLayout.width / 2, py + panelH - 175);
+        smallFont.setColor(Color.WHITE);
+
         game.batch.end();
     }
 
