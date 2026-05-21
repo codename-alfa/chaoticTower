@@ -50,10 +50,15 @@ public class ApiClient {
             @Override
             public void handleHttpResponse(Net.HttpResponse httpResponse) {
                 try {
-                    String resultAsString = httpResponse.getResultAsString();
-                    JsonReader reader = new JsonReader();
-                    JsonValue json = reader.parse(resultAsString);
-                    Gdx.app.postRunnable(() -> callback.onSuccess(json));
+                    int statusCode = httpResponse.getStatus().getStatusCode();
+                    if (statusCode >= 200 && statusCode < 300) {
+                        String resultAsString = httpResponse.getResultAsString();
+                        JsonReader reader = new JsonReader();
+                        JsonValue json = reader.parse(resultAsString);
+                        Gdx.app.postRunnable(() -> callback.onSuccess(json));
+                    } else {
+                        Gdx.app.postRunnable(() -> callback.onFailure(new Exception("HTTP error " + statusCode)));
+                    }
                 } catch (Exception e) {
                     Gdx.app.postRunnable(() -> callback.onFailure(e));
                 }

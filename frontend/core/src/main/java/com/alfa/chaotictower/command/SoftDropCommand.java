@@ -9,7 +9,7 @@ import com.alfa.chaotictower.entity.Block;
  */
 public class SoftDropCommand implements InputCommand {
 
-    private static final float FALL_SPEED_NORMAL = -2.5f;
+    private static final float FALL_SPEED_NORMAL = -1.5f;
     private static final float FALL_SPEED_FAST   = -12.0f;
 
     private final boolean fast;

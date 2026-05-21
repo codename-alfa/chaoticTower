@@ -67,6 +67,14 @@ public class PlayingScreen extends ScreenAdapter {
     private static final float RENDER_TILE = Block.TILE_SIZE;
     private static final float RENDER_HALF = RENDER_TILE / 2f;
 
+    private static final Color CARD_BG = new Color(0.10f, 0.10f, 0.20f, 0.85f);
+    private static final Color CARD_SEL = new Color(0.18f, 0.15f, 0.35f, 0.95f);
+    private static final Color ACCENT = new Color(0.45f, 0.35f, 0.85f, 1);
+    
+    private int pauseSelectedIndex = 0;
+    private static final String[] PAUSE_OPTS = {"Resume Game", "Quit to Menu"};
+    private static final String[] PAUSE_DESC = {"Continue playing", "Return to mode selection"};
+
     private static final Color[] BLOCK_COLORS = {
         new Color(0.95f, 0.90f, 0.20f, 1),  // O — Yellow
         new Color(0.20f, 0.90f, 0.95f, 1),  // I — Cyan
@@ -243,12 +251,11 @@ public class PlayingScreen extends ScreenAdapter {
     public void render(float delta) {
         if (gameOver) return;
 
-        // ── Pause toggle ──
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             paused = !paused;
+            pauseSelectedIndex = 0;
         }
 
-        // Only advance game logic when not paused
         if (!paused) {
             elapsedTime += delta;
 
@@ -270,13 +277,11 @@ public class PlayingScreen extends ScreenAdapter {
             for (Player p : players) updatePlayer(p, delta);
         }
 
-        // ── Always render (even when paused) ──
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         viewport.apply();
 
-        // ── World-space rendering ──
         shapeRenderer.setProjectionMatrix(camera.combined);
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -289,23 +294,28 @@ public class PlayingScreen extends ScreenAdapter {
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // ── HUD ──
         game.batch.setProjectionMatrix(hudCamera.combined);
         game.batch.begin();
         drawHud();
         game.batch.end();
 
-        // ── Pause overlay (drawn on top of everything) ──
         if (paused) {
             drawPauseOverlay();
-        }
 
-        // ── Pause menu input (after all rendering) ──
-        if (paused) {
-            if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
-                paused = false;
-                gameOver = true;
-                game.setScreen(new ModeSelectScreen(game, loggedInPlayerId));
+            if (Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W)) {
+                pauseSelectedIndex = Math.max(0, pauseSelectedIndex - 1);
+            }
+            if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || Gdx.input.isKeyJustPressed(Input.Keys.S)) {
+                pauseSelectedIndex = Math.min(1, pauseSelectedIndex + 1);
+            }
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+                if (pauseSelectedIndex == 0) {
+                    paused = false;
+                } else {
+                    paused = false;
+                    gameOver = true;
+                    game.setScreen(new ModeSelectScreen(game, loggedInPlayerId));
+                }
             }
         }
     }
@@ -318,38 +328,53 @@ public class PlayingScreen extends ScreenAdapter {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-        // Dark semi-transparent overlay
         shapeRenderer.setProjectionMatrix(hudCamera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(0, 0, 0, 0.65f);
+        shapeRenderer.setColor(0, 0, 0, 0.75f);
         shapeRenderer.rect(0, 0, w, h);
 
-        // Center panel
-        float panelW = 420, panelH = 260;
-        float px = cx - panelW / 2, py = h / 2f - panelH / 2;
-        shapeRenderer.setColor(0.08f, 0.08f, 0.16f, 0.92f);
-        shapeRenderer.rect(px, py, panelW, panelH);
-        // Accent top edge
-        shapeRenderer.setColor(0.45f, 0.35f, 0.85f, 0.9f);
-        shapeRenderer.rect(px, py + panelH - 4, panelW, 4);
-        shapeRenderer.end();
+        float cardW = 360, cardH = 90, gap = 20;
+        float totalH = 2 * cardH + gap;
+        float startY = h / 2f + totalH / 2f - 40;
 
+        for (int i = 0; i < 2; i++) {
+            float y = startY - i * (cardH + gap);
+            boolean sel = (i == pauseSelectedIndex);
+            
+            shapeRenderer.setColor(sel ? CARD_SEL : CARD_BG);
+            shapeRenderer.rect(cx - cardW / 2, y, cardW, cardH);
+            
+            if (sel) {
+                shapeRenderer.setColor(ACCENT);
+                shapeRenderer.rect(cx - cardW / 2, y, 5, cardH);
+            }
+        }
+        shapeRenderer.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // Text
         game.batch.setProjectionMatrix(hudCamera.combined);
         game.batch.begin();
 
         glyphLayout.setText(titleFont, "PAUSED");
-        titleFont.draw(game.batch, "PAUSED", cx - glyphLayout.width / 2, py + panelH - 40);
+        titleFont.draw(game.batch, "PAUSED", cx - glyphLayout.width / 2, startY + cardH + 80);
 
-        glyphLayout.setText(menuFont, "Press ESC to Resume");
-        menuFont.draw(game.batch, "Press ESC to Resume", cx - glyphLayout.width / 2, py + panelH - 120);
+        for (int i = 0; i < 2; i++) {
+            float y = startY - i * (cardH + gap);
+            boolean sel = (i == pauseSelectedIndex);
+            
+            if (sel) menuFont.setColor(Color.WHITE);
+            else menuFont.setColor(0.6f, 0.6f, 0.7f, 1);
+            menuFont.draw(game.batch, PAUSE_OPTS[i], cx - 140, y + cardH - 20);
 
-        smallFont.setColor(0.8f, 0.5f, 0.5f, 1);
-        glyphLayout.setText(smallFont, "Press Q to Quit to Menu");
-        smallFont.draw(game.batch, "Press Q to Quit to Menu", cx - glyphLayout.width / 2, py + panelH - 175);
+            smallFont.setColor(0.5f, 0.5f, 0.6f, 1);
+            smallFont.draw(game.batch, PAUSE_DESC[i], cx - 140, y + 30);
+        }
+
+        menuFont.setColor(Color.WHITE);
         smallFont.setColor(Color.WHITE);
+
+        glyphLayout.setText(smallFont, "[ENTER] Select     [ESC] Resume");
+        smallFont.draw(game.batch, "[ENTER] Select     [ESC] Resume", cx - glyphLayout.width / 2, 50);
 
         game.batch.end();
     }

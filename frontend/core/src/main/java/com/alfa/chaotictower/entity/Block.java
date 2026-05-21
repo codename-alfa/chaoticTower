@@ -13,13 +13,13 @@ public class Block implements Pool.Poolable {
     public static final float TILE_SIZE = 0.5f;
     private static final float HALF_TILE = (TILE_SIZE / 2f) - 0.01f;
 
-    private static final float DENSITY              = 1.5f;
-    private static final float FRICTION             = 0.55f;
+    private static final float DENSITY              = 3.0f;
+    private static final float FRICTION             = 0.85f;
     private static final float RESTITUTION          = 0.0f;
 
-    private static final float RELEASED_GRAVITY_SCALE   = 1.2f;
-    private static final float RELEASED_ANGULAR_DAMPING = 2.5f;
-    private static final float RELEASED_LINEAR_DAMPING  = 0.05f;
+    private static final float RELEASED_GRAVITY_SCALE   = 1.8f;
+    private static final float RELEASED_ANGULAR_DAMPING = 5.0f;
+    private static final float RELEASED_LINEAR_DAMPING  = 1.5f;
 
     public Body body;
     public int ownerId;
@@ -78,6 +78,14 @@ public class Block implements Pool.Poolable {
             body.setLinearDamping(0f);
             body.setAngularDamping(0f);
         } else {
+            // Snap X to nearest grid cell so blocks land in perfect alignment.
+            // Use HALF_GRID because some shapes (O, I) have half-unit offsets,
+            // placing their body center at quarter-unit positions.
+            Vector2 pos = body.getPosition();
+            float grid = TILE_SIZE / 2f;
+            float snappedX = Math.round(pos.x / grid) * grid;
+            body.setTransform(snappedX, pos.y, body.getAngle());
+
             body.setLinearVelocity(0, 0);
             body.setAngularVelocity(0);
             body.setGravityScale(RELEASED_GRAVITY_SCALE);

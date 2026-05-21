@@ -67,7 +67,14 @@ public class MainMenuScreen extends ScreenAdapter {
             }
             @Override
             public void onFailure(Throwable t) {
-                Gdx.app.postRunnable(() -> { isConnecting = false; errorMessage = "Connection failed. Is the server running?"; });
+                Gdx.app.postRunnable(() -> {
+                    isConnecting = false;
+                    if (t.getMessage() != null && !t.getMessage().isEmpty()) {
+                        errorMessage = "Error: " + t.getMessage();
+                    } else {
+                        errorMessage = "Connection failed. Is the server running?";
+                    }
+                });
             }
         });
     }
