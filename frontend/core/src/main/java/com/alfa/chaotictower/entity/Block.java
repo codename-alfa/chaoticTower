@@ -13,13 +13,13 @@ public class Block implements Pool.Poolable {
     public static final float TILE_SIZE = 0.5f;
     private static final float HALF_TILE = (TILE_SIZE / 2f) - 0.01f;
 
-    private static final float DENSITY              = 3.0f;
-    private static final float FRICTION             = 0.85f;
+    private static final float DENSITY              = 8.0f;
+    private static final float FRICTION             = 10.0f;
     private static final float RESTITUTION          = 0.0f;
 
     private static final float RELEASED_GRAVITY_SCALE   = 1.8f;
-    private static final float RELEASED_ANGULAR_DAMPING = 5.0f;
-    private static final float RELEASED_LINEAR_DAMPING  = 1.5f;
+    private static final float RELEASED_ANGULAR_DAMPING = 8.0f;
+    private static final float RELEASED_LINEAR_DAMPING  = 0.8f;
 
     public Body body;
     public int ownerId;
@@ -30,6 +30,9 @@ public class Block implements Pool.Poolable {
 
     private final FixtureDef cachedFixtureDef;
 
+    private float scale = 1.0f;
+    private boolean frosted = false;
+
     public Block() {
         cachedFixtureDef = new FixtureDef();
         cachedFixtureDef.density     = DENSITY;
@@ -37,28 +40,38 @@ public class Block implements Pool.Poolable {
         cachedFixtureDef.restitution = RESTITUTION;
     }
 
-    public void init(World world, float x, float y, Vector2[] tileOffsets, int ownerId, int tetrominoType) {
+    public void init(World world, float x, float y, Vector2[] tileOffsets, int ownerId, int tetrominoType, float scale) {
         this.ownerId = ownerId;
         this.tetrominoType = tetrominoType;
+        this.scale = scale;
 
         // Store scaled tile positions for rendering
         localTilePositions = new Vector2[tileOffsets.length];
         for (int i = 0; i < tileOffsets.length; i++) {
-            localTilePositions[i] = new Vector2(tileOffsets[i]).scl(TILE_SIZE);
+            localTilePositions[i] = new Vector2(tileOffsets[i]).scl(TILE_SIZE * scale);
         }
 
         BodyDef bodyDef = new BodyDef();
         // WAJIB DynamicBody — bukan KinematicBody.
-        // KinematicBody tidak mendapat penetration correction dari StaticBody,
-        // sehingga blok menembus pulau tanpa hambatan.
-        // DynamicBody mendapat koreksi penuh; gravitasi dimatikan via gravityScale=0.
         bodyDef.type = BodyDef.BodyType.DynamicBody;
-        bodyDef.position.set(x, y);
+        
+        // Align spawn X to correct grid line/cell based on width parity to eliminate landing snap
+        float grid = TILE_SIZE * scale;
+        float adjustedX = x;
+        if (tileOffsets != null && tileOffsets.length > 0) {
+            float firstTileX = tileOffsets[0].x;
+            boolean isEven = Math.abs(firstTileX - Math.round(firstTileX)) > 0.25f;
+            if (isEven) {
+                adjustedX = x + grid / 2f;
+            }
+        }
+        bodyDef.position.set(adjustedX, y);
         body = world.createBody(bodyDef);
 
+        float halfTile = (TILE_SIZE * scale / 2f) - 0.01f;
         for (Vector2 offset : tileOffsets) {
             PolygonShape shape = new PolygonShape();
-            shape.setAsBox(HALF_TILE, HALF_TILE, new Vector2(offset).scl(TILE_SIZE), 0);
+            shape.setAsBox(halfTile, halfTile, new Vector2(offset).scl(TILE_SIZE * scale), 0);
             cachedFixtureDef.shape = shape;
             body.createFixture(cachedFixtureDef);
             shape.dispose();
@@ -66,6 +79,29 @@ public class Block implements Pool.Poolable {
         cachedFixtureDef.shape = null;
 
         setControlled(true);
+    }
+
+    public float getSnappedX() {
+        if (body == null) return 0f;
+        Vector2 pos = body.getPosition();
+        float grid = TILE_SIZE * scale;
+        if (localTilePositions != null && localTilePositions.length > 0) {
+            float angle = body.getAngle();
+            float cos = com.badlogic.gdx.math.MathUtils.cos(angle);
+            float sin = com.badlogic.gdx.math.MathUtils.sin(angle);
+            Vector2 localPos = localTilePositions[0];
+            float offsetRotX = (localPos.x * cos - localPos.y * sin) / grid;
+            boolean isEven = Math.abs(offsetRotX - Math.round(offsetRotX)) > 0.25f;
+
+            if (isEven) {
+                float halfGrid = grid / 2f;
+                return Math.round((pos.x - halfGrid) / grid) * grid + halfGrid;
+            } else {
+                return Math.round(pos.x / grid) * grid;
+            }
+        } else {
+            return Math.round(pos.x / grid) * grid;
+        }
     }
 
     public void setControlled(boolean controlled) {
@@ -78,13 +114,9 @@ public class Block implements Pool.Poolable {
             body.setLinearDamping(0f);
             body.setAngularDamping(0f);
         } else {
-            // Snap X to nearest grid cell so blocks land in perfect alignment.
-            // Use HALF_GRID because some shapes (O, I) have half-unit offsets,
-            // placing their body center at quarter-unit positions.
-            Vector2 pos = body.getPosition();
-            float grid = TILE_SIZE / 2f;
-            float snappedX = Math.round(pos.x / grid) * grid;
-            body.setTransform(snappedX, pos.y, body.getAngle());
+            // Snap X to nearest grid cell using the helper so landing snap distance is exactly 0.0f
+            float snappedX = getSnappedX();
+            body.setTransform(snappedX, body.getPosition().y, body.getAngle());
 
             body.setLinearVelocity(0, 0);
             body.setAngularVelocity(0);
@@ -117,6 +149,12 @@ public class Block implements Pool.Poolable {
     public boolean isIvied() { return ivied; }
     public void setIvied(boolean ivied) { this.ivied = ivied; }
 
+    public float getScale() { return scale; }
+    public void setScale(float scale) { this.scale = scale; }
+
+    public boolean isFrosted() { return frosted; }
+    public void setFrosted(boolean frosted) { this.frosted = frosted; }
+
     @Override
     public void reset() {
         body              = null;
@@ -126,5 +164,7 @@ public class Block implements Pool.Poolable {
         localTilePositions = null;
         cemented          = false;
         ivied             = false;
+        scale             = 1.0f;
+        frosted           = false;
     }
 }

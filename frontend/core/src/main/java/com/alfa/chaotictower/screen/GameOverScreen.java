@@ -24,7 +24,7 @@ public class GameOverScreen extends ScreenAdapter {
     private final String resultText;
 
     private ShapeRenderer shapes;
-    private BitmapFont titleFont, menuFont, smallFont;
+    private BitmapFont titleFont, menuFont, hudFont, smallFont;
     private final GlyphLayout glyph = new GlyphLayout();
     private String statusMessage = "Saving score to server...";
     private boolean isProcessDone = false;
@@ -55,6 +55,7 @@ public class GameOverScreen extends ScreenAdapter {
         GameAssetManager assets = GameAssetManager.getInstance();
         titleFont = assets.getFont(GameAssetManager.FONT_TITLE);
         menuFont  = assets.getFont(GameAssetManager.FONT_MENU);
+        hudFont   = assets.getFont(GameAssetManager.FONT_HUD);
         smallFont = assets.getFont(GameAssetManager.FONT_SMALL);
 
         if (playerId != null) {
@@ -89,9 +90,9 @@ public class GameOverScreen extends ScreenAdapter {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         shapes.rect(0, 0, w, h, BG_BOT, BG_BOT, BG_TOP, BG_TOP);
 
-        // Stats panel
-        float panelW = 600, panelH = 320;
-        float panelX = cx - panelW / 2, panelY = h / 2f - 120;
+        // Stats panel (resized to fit elegantly and prevent any overlaps)
+        float panelW = 560, panelH = 260;
+        float panelX = cx - panelW / 2, panelY = h / 2f - 110;
         shapes.setColor(PANEL);
         shapes.rect(panelX, panelY, panelW, panelH);
         // Panel accent top edge
@@ -104,45 +105,54 @@ public class GameOverScreen extends ScreenAdapter {
         // Text
         game.batch.begin();
 
-        // GAME OVER title
+        // GAME OVER title (scaled down slightly for sleek, modern appearance)
         float bob = 4f * (float) Math.sin(time * 2.0);
+        titleFont.getData().setScale(0.8f);
         glyph.setText(titleFont, "GAME OVER");
         titleFont.setColor(0.95f, 0.25f, 0.25f, 1);
-        titleFont.draw(game.batch, "GAME OVER", cx - glyph.width / 2, h - 120 + bob);
+        titleFont.draw(game.batch, "GAME OVER", cx - glyph.width / 2, h - 75 + bob);
         titleFont.setColor(Color.WHITE);
+        titleFont.getData().setScale(1.0f);
 
-        // Result text
+        // Result text (scaled menuFont with precise offset)
+        menuFont.getData().setScale(0.8f);
         String[] lines = resultText.split("\n");
         for (int i = 0; i < lines.length; i++) {
             glyph.setText(menuFont, lines[i]);
-            menuFont.draw(game.batch, lines[i], cx - glyph.width / 2, h - 220 - i * 48);
+            menuFont.draw(game.batch, lines[i], cx - glyph.width / 2, h - 130 - i * 35);
         }
+        menuFont.getData().setScale(1.0f);
 
         // Stats inside panel
-        float sy = panelY + panelH - 40;
+        float sy = panelY + panelH - 35;
         float sx = panelX + 40;
-        smallFont.setColor(0.7f, 0.7f, 0.8f, 1);
-        smallFont.draw(game.batch, "Mode", sx, sy);
-        smallFont.draw(game.batch, "Score", sx, sy - 50);
-        smallFont.draw(game.batch, "Time", sx, sy - 100);
-        smallFont.draw(game.batch, "Max Height", sx, sy - 150);
-        smallFont.draw(game.batch, "Status", sx, sy - 210);
-
         float vx = panelX + panelW - 40;
-        menuFont.setColor(Color.WHITE);
-        glyph.setText(menuFont, gameMode);
-        menuFont.draw(game.batch, gameMode, vx - glyph.width, sy);
-        glyph.setText(menuFont, String.valueOf(score));
-        menuFont.draw(game.batch, String.valueOf(score), vx - glyph.width, sy - 50);
-        glyph.setText(menuFont, String.format("%.1fs", timeRecord));
-        menuFont.draw(game.batch, String.format("%.1fs", timeRecord), vx - glyph.width, sy - 100);
-        glyph.setText(menuFont, String.format("%.1fm", maxHeight));
-        menuFont.draw(game.batch, String.format("%.1fm", maxHeight), vx - glyph.width, sy - 150);
+
+        smallFont.getData().setScale(0.85f);
+        smallFont.setColor(0.7f, 0.7f, 0.8f, 1);
+        smallFont.draw(game.batch, "Mode", sx, sy + 3);
+        smallFont.draw(game.batch, "Score", sx, sy - 45 + 3);
+        smallFont.draw(game.batch, "Time", sx, sy - 90 + 3);
+        smallFont.draw(game.batch, "Max Height", sx, sy - 135 + 3);
+        smallFont.draw(game.batch, "Status", sx, sy - 185 + 3);
+
+        hudFont.getData().setScale(0.8f);
+        hudFont.setColor(Color.WHITE);
+        glyph.setText(hudFont, gameMode);
+        hudFont.draw(game.batch, gameMode, vx - glyph.width, sy);
+        glyph.setText(hudFont, String.valueOf(score));
+        hudFont.draw(game.batch, String.valueOf(score), vx - glyph.width, sy - 45);
+        glyph.setText(hudFont, String.format("%.1fs", timeRecord));
+        hudFont.draw(game.batch, String.format("%.1fs", timeRecord), vx - glyph.width, sy - 90);
+        glyph.setText(hudFont, String.format("%.1fm", maxHeight));
+        hudFont.draw(game.batch, String.format("%.1fm", maxHeight), vx - glyph.width, sy - 135);
+        hudFont.getData().setScale(1.0f);
 
         if (statusMessage.contains("saved")) smallFont.setColor(0.3f, 0.9f, 0.4f, 1);
         else if (statusMessage.contains("failed")) smallFont.setColor(1f, 0.4f, 0.4f, 1);
         else smallFont.setColor(0.8f, 0.8f, 0.5f, 1);
-        smallFont.draw(game.batch, statusMessage, sx, sy - 210);
+        glyph.setText(smallFont, statusMessage);
+        smallFont.draw(game.batch, statusMessage, vx - glyph.width, sy - 185);
         smallFont.setColor(Color.WHITE);
 
         // Continue prompt
@@ -150,9 +160,10 @@ public class GameOverScreen extends ScreenAdapter {
             float blink = ((int)(time * 2) % 2 == 0) ? 1f : 0.5f;
             smallFont.setColor(1, 1, 1, blink);
             glyph.setText(smallFont, "Press SPACE to return to Main Menu");
-            smallFont.draw(game.batch, "Press SPACE to return to Main Menu", cx - glyph.width / 2, panelY - 30);
+            smallFont.draw(game.batch, "Press SPACE to return to Main Menu", cx - glyph.width / 2, panelY - 35);
             smallFont.setColor(Color.WHITE);
         }
+        smallFont.getData().setScale(1.0f);
 
         game.batch.end();
 

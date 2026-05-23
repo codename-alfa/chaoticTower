@@ -15,11 +15,21 @@ public class ApiClient {
         void onFailure(Throwable t);
     }
 
-    public static void login(String username, ApiCallback callback) {
+    public static void login(String username, String password, ApiCallback callback) {
         HttpRequestBuilder requestBuilder = new HttpRequestBuilder();
         Net.HttpRequest request = requestBuilder.newRequest()
             .method(Net.HttpMethods.POST)
-            .url(BASE_URL + "/players/login?username=" + username)
+            .url(BASE_URL + "/players/login?username=" + username + "&password=" + password)
+            .build();
+
+        sendRequest(request, callback);
+    }
+
+    public static void register(String username, String password, ApiCallback callback) {
+        HttpRequestBuilder requestBuilder = new HttpRequestBuilder();
+        Net.HttpRequest request = requestBuilder.newRequest()
+            .method(Net.HttpMethods.POST)
+            .url(BASE_URL + "/players/register?username=" + username + "&password=" + password)
             .build();
 
         sendRequest(request, callback);
@@ -57,7 +67,8 @@ public class ApiClient {
                         JsonValue json = reader.parse(resultAsString);
                         Gdx.app.postRunnable(() -> callback.onSuccess(json));
                     } else {
-                        Gdx.app.postRunnable(() -> callback.onFailure(new Exception("HTTP error " + statusCode)));
+                        String errorBody = httpResponse.getResultAsString();
+                        Gdx.app.postRunnable(() -> callback.onFailure(new Exception(errorBody != null && !errorBody.trim().isEmpty() ? errorBody.trim() : "HTTP error " + statusCode)));
                     }
                 } catch (Exception e) {
                     Gdx.app.postRunnable(() -> callback.onFailure(e));

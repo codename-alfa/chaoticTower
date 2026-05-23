@@ -104,14 +104,14 @@ public class BlockFactory {
         return shapeDefinitions.get(typeIndex);
     }
 
-    public Block spawnBlock(World world, float x, float y, int ownerId) {
+    public Block spawnBlock(World world, float x, float y, int ownerId, float scale) {
         List<Integer> bag = getBag(ownerId);
         int typeIndex = bag.remove(0);
 
         Block block = blockPool.obtain();
         // Offset di-pass by reference (read-only di Block.init()) — aman, tanpa alokasi
         Vector2[] offsets = shapeDefinitions.get(typeIndex);
-        block.init(world, x, y, offsets, ownerId, typeIndex);
+        block.init(world, x, y, offsets, ownerId, typeIndex, scale);
         return block;
     }
 

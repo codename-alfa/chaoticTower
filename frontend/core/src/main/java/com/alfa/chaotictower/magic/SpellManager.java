@@ -12,7 +12,6 @@ import java.util.List;
  * Spells are granted based on tower height milestones.
  */
 public class SpellManager {
-
     /** Height interval between spell grants (in Box2D world units). */
     private static final float SPELL_GRANT_INTERVAL = 4.0f;
 
@@ -27,9 +26,15 @@ public class SpellManager {
     /** Currently active timed effects per player (effects ON them). */
     private final List<ActiveSpell>[] activeEffects;
 
+    /** Remaining cooldown time per player. */
+    private final float[] spellCooldown;
+
     /** All spell definitions (Light and Dark). */
     private final List<Spell> lightSpells = new ArrayList<>();
     private final List<Spell> darkSpells  = new ArrayList<>();
+    private final List<Spell> allSpells   = new ArrayList<>();
+
+    private final java.util.Random random = new java.util.Random();
 
     private int lightIndex = 0;
     private int darkIndex  = 0;
@@ -40,33 +45,57 @@ public class SpellManager {
         availableSpell = new Spell[playerCount];
         nextSpellHeight = new float[playerCount];
         activeEffects = new List[playerCount];
+        spellCooldown = new float[playerCount];
 
         for (int i = 0; i < playerCount; i++) {
             nextSpellHeight[i] = SPELL_GRANT_INTERVAL;
             activeEffects[i] = new ArrayList<>();
+            spellCooldown[i] = 0.0f;
         }
     }
 
-    public void registerLightSpell(Spell spell) { lightSpells.add(spell); }
-    public void registerDarkSpell(Spell spell)  { darkSpells.add(spell); }
+    public void registerLightSpell(Spell spell) {
+        lightSpells.add(spell);
+        allSpells.add(spell);
+    }
+
+    public void registerDarkSpell(Spell spell) {
+        darkSpells.add(spell);
+        allSpells.add(spell);
+    }
+
+    public Spell getRandomSpell() {
+        if (allSpells.isEmpty()) return null;
+        return allSpells.get(random.nextInt(allSpells.size()));
+    }
 
     /**
      * Called every frame. Checks height milestones and updates timed effects.
      */
     public void update(float delta, Player[] players, float[] maxHeights, World world, Array<Block> activeBlocks) {
-        // Grant spells based on height
+        // Spells are only available in 2 Players mode
+        if (playerCount != 2) return;
+
+        // Grant spells based on height milestones
         for (int i = 0; i < players.length; i++) {
-            if (availableSpell[i] == null && maxHeights[i] >= nextSpellHeight[i]) {
-                // Auto-grant: alternate light/dark based on height milestone count
-                int milestone = (int)(maxHeights[i] / SPELL_GRANT_INTERVAL);
-                if (milestone % 2 == 1 && !darkSpells.isEmpty() && playerCount > 1) {
-                    availableSpell[i] = darkSpells.get(darkIndex % darkSpells.size());
-                    darkIndex++;
-                } else if (!lightSpells.isEmpty()) {
-                    availableSpell[i] = lightSpells.get(lightIndex % lightSpells.size());
-                    lightIndex++;
+            if (maxHeights[i] >= nextSpellHeight[i]) {
+                // Milestone reached: if no spell is held and not on cooldown, grant a random spell
+                if (availableSpell[i] == null && spellCooldown[i] <= 0) {
+                    availableSpell[i] = getRandomSpell();
                 }
                 nextSpellHeight[i] += SPELL_GRANT_INTERVAL;
+            }
+        }
+
+        // Update cooldowns
+        for (int i = 0; i < playerCount; i++) {
+            if (spellCooldown[i] > 0) {
+                spellCooldown[i] -= delta;
+                if (spellCooldown[i] <= 0) {
+                    spellCooldown[i] = 0.0f;
+                    // Cooldown finished -> automatically grant a new random mystery spell!
+                    availableSpell[i] = getRandomSpell();
+                }
             }
         }
 
@@ -91,8 +120,13 @@ public class SpellManager {
      * @return the spell that was cast, or null if none available
      */
     public Spell castSpell(int casterIndex, Player[] players, World world, Array<Block> activeBlocks) {
+        if (playerCount != 2) return null; // Spells only available in 2 Players mode
+
         Spell spell = availableSpell[casterIndex];
         if (spell == null) return null;
+
+        // If on cooldown, cannot cast
+        if (spellCooldown[casterIndex] > 0) return null;
 
         Player caster = players[casterIndex];
         Player target;
@@ -100,25 +134,39 @@ public class SpellManager {
         if (spell.isLight()) {
             target = caster; // Light spells target self
         } else {
-            // Dark spells target opponent (in 2P) or self (in 1P, as penalty)
-            target = (playerCount > 1) ? players[1 - casterIndex] : caster;
+            // Dark spells target opponent (in 2P)
+            target = players[1 - casterIndex];
         }
 
         SpellContext context = new SpellContext(caster, target, world, activeBlocks);
         spell.apply(context);
 
         if (!spell.isInstant()) {
-            int targetIndex = spell.isLight() ? casterIndex : (playerCount > 1 ? 1 - casterIndex : casterIndex);
+            int targetIndex = spell.isLight() ? casterIndex : 1 - casterIndex;
             activeEffects[targetIndex].add(new ActiveSpell(spell, context, spell.getDuration()));
         }
 
         availableSpell[casterIndex] = null;
+        spellCooldown[casterIndex] = 15.0f; // Start 15-second cooldown
         return spell;
     }
 
     /** Returns the available spell for the player, or null. */
     public Spell getAvailableSpell(int playerIndex) {
         return (playerIndex >= 0 && playerIndex < availableSpell.length) ? availableSpell[playerIndex] : null;
+    }
+
+    /** Get the remaining spell cooldown for the player. */
+    public float getSpellCooldown(int playerIndex) {
+        if (playerIndex >= 0 && playerIndex < spellCooldown.length) {
+            return spellCooldown[playerIndex];
+        }
+        return 0.0f;
+    }
+
+    /** Check if a player's spell casting is currently on cooldown. */
+    public boolean isOnCooldown(int playerIndex) {
+        return getSpellCooldown(playerIndex) > 0.0f;
     }
 
     /** Check if a specific effect type is active on a player. */

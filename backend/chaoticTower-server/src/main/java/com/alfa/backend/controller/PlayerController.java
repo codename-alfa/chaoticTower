@@ -18,9 +18,23 @@ public class PlayerController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Player> login(@RequestParam String username) {
-        Player player = playerService.registerOrLogin(username);
-        return ResponseEntity.ok(player);
+    public ResponseEntity<?> login(@RequestParam String username, @RequestParam String password) {
+        try {
+            Player player = playerService.login(username, password);
+            return ResponseEntity.ok(player);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestParam String username, @RequestParam String password) {
+        try {
+            Player player = playerService.register(username, password);
+            return ResponseEntity.ok(player);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).body(e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")

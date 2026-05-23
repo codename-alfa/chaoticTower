@@ -27,7 +27,14 @@ public class Player {
     }
 
     public void spawnNewBlock(World world) {
-        currentBlock = BlockFactory.getInstance().spawnBlock(world, spawnX, spawnY, id);
+        float scale = isWeighted() ? 2.0f : 1.0f;
+        currentBlock = BlockFactory.getInstance().spawnBlock(world, spawnX, spawnY, id, scale);
+        if (isFrosted()) {
+            currentBlock.setFrosted(true);
+            for (com.badlogic.gdx.physics.box2d.Fixture f : currentBlock.body.getFixtureList()) {
+                f.setFriction(0.02f);
+            }
+        }
     }
 
     public Block getCurrentBlock() {

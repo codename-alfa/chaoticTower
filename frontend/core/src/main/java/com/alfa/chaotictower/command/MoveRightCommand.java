@@ -12,6 +12,14 @@ public class MoveRightCommand implements InputCommand {
     public void execute(Block block) {
         if (block == null || !block.isControlled()) return;
         Vector2 pos = block.body.getPosition();
-        block.body.setTransform(pos.x + MOVE_STEP, pos.y, block.body.getAngle());
+        float origX = pos.x;
+        float moveStep = MOVE_STEP * block.getScale();
+        float newX = origX + moveStep;
+        
+        block.body.setTransform(newX, pos.y, block.body.getAngle());
+        if (CollisionUtils.hasOverlap(block.body, block.body.getWorld())) {
+            // Revert movement to avoid physical overlap and subsequent drift
+            block.body.setTransform(origX, pos.y, block.body.getAngle());
+        }
     }
 }

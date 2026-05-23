@@ -71,14 +71,15 @@ public class PlayingScreen extends ScreenAdapter {
 
     // ─── Magic Spell System ──────────────────────────────────────
     private SpellManager spellManager;
-    private static final int[] SPELL_CAST_KEYS = { Input.Keys.E, Input.Keys.NUMPAD_0 };
+    private static final int[] SPELL_CAST_KEYS = { Input.Keys.F, Input.Keys.NUMPAD_0 };
 
     // ─── Camera Follow ───────────────────────────────────────────
     private static final float CAMERA_LERP_SPEED = 2.5f;
     private static final float MIN_CAMERA_Y = 15f; // half of viewport height 30
+    private boolean transitioning = false;
 
     // ─── Physics constants ──────────────────────────────────────────
-    private static final float WORLD_GRAVITY           = -15f;
+    private static final float WORLD_GRAVITY           = -6.0f;
     private static final int   STEP_VEL_ITERATIONS     = 10;
     private static final int   STEP_POS_ITERATIONS     = 8;
     private static final float LANDING_NORMAL_THRESHOLD = 0.4f;
@@ -200,9 +201,16 @@ public class PlayingScreen extends ScreenAdapter {
             public void preSolve(Contact contact, Manifold oldManifold) {
                 Fixture fa = contact.getFixtureA();
                 Fixture fb = contact.getFixtureB();
-                if (isFixtureControlled(fa) || isFixtureControlled(fb)) {
-                    Vector2 normal = contact.getWorldManifold().getNormal();
-                    contact.setFriction(Math.abs(normal.y) < 0.5f ? 0f : 1.0f);
+                Block controlled = getControlledBlock(fa);
+                if (controlled == null) controlled = getControlledBlock(fb);
+
+                if (controlled != null) {
+                    if (controlled.isFrosted()) {
+                        contact.setFriction(0.02f);
+                    } else {
+                        Vector2 normal = contact.getWorldManifold().getNormal();
+                        contact.setFriction(Math.abs(normal.y) < 0.5f ? 0f : 1.0f);
+                    }
                 }
             }
             @Override public void postSolve(Contact contact, ContactImpulse impulse) {}
@@ -261,6 +269,14 @@ public class PlayingScreen extends ScreenAdapter {
         return false;
     }
 
+    private Block getControlledBlock(Fixture f) {
+        for (Player p : players) {
+            Block b = p.getCurrentBlock();
+            if (b != null && f.getBody() == b.body) return b;
+        }
+        return null;
+    }
+
     private void checkLanding(Contact contact) {
         Fixture fa = contact.getFixtureA(), fb = contact.getFixtureB();
         if (!isFixtureControlled(fa) && !isFixtureControlled(fb)) return;
@@ -283,7 +299,7 @@ public class PlayingScreen extends ScreenAdapter {
     // ─── Main render loop ───────────────────────────────────────────
     @Override
     public void render(float delta) {
-        if (gameOver) return;
+        if (gameOver || transitioning) return;
 
         // ── Countdown phase ─────────────────────────────────────────
         if (!countdownDone) {
@@ -307,11 +323,36 @@ public class PlayingScreen extends ScreenAdapter {
 
             for (int i = 0; i < players.length; i++) inputHandlers[i].handleInput(players[i]);
 
+            // Save controlled blocks' X positions before physics step to prevent horizontal drift/nudging by physics
+            float[] savedControlledX = new float[players.length];
+            boolean[] hasControlledBlock = new boolean[players.length];
+            for (int i = 0; i < players.length; i++) {
+                Block b = players[i].getCurrentBlock();
+                if (b != null && b.isControlled() && b.body != null) {
+                    savedControlledX[i] = b.body.getPosition().x;
+                    hasControlledBlock[i] = true;
+                }
+            }
+
             world.step(1 / 60f, STEP_VEL_ITERATIONS, STEP_POS_ITERATIONS);
+
+            // Restore controlled blocks' X positions to maintain perfect grid alignment
+            for (int i = 0; i < players.length; i++) {
+                if (hasControlledBlock[i]) {
+                    Block b = players[i].getCurrentBlock();
+                    if (b != null && b.isControlled() && b.body != null) {
+                        Vector2 pos = b.body.getPosition();
+                        b.body.setTransform(savedControlledX[i], pos.y, b.body.getAngle());
+                        Vector2 vel = b.body.getLinearVelocity();
+                        b.body.setLinearVelocity(0, vel.y);
+                    }
+                }
+            }
+
             processSettleQueue();
             updateMaxHeights();
             checkOutOfBounds();
-            if (gameOver) return;
+            if (gameOver || transitioning) return;
 
             float[] mh = getMaxHeightsArray();
             if (strategy.checkWinCondition(players, elapsedTime, mh) ||
@@ -353,10 +394,17 @@ public class PlayingScreen extends ScreenAdapter {
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
+        // Reset OpenGL viewport to the full window size so that HUD is drawn on the full screen
+        Gdx.gl.glViewport(0, 0, screenWidth, screenHeight);
+
+        if (countdownDone) {
+            drawHudBackgrounds();
+        }
+
         game.batch.setProjectionMatrix(hudCamera.combined);
         game.batch.begin();
         if (countdownDone) {
-            drawHud();
+            drawHudText();
         }
         game.batch.end();
 
@@ -381,6 +429,7 @@ public class PlayingScreen extends ScreenAdapter {
                     paused = false;
                     gameOver = true;
                     game.setScreen(new ModeSelectScreen(game, loggedInPlayerId));
+                    return;
                 }
             }
         }
@@ -430,10 +479,10 @@ public class PlayingScreen extends ScreenAdapter {
             
             if (sel) menuFont.setColor(Color.WHITE);
             else menuFont.setColor(0.6f, 0.6f, 0.7f, 1);
-            menuFont.draw(game.batch, PAUSE_OPTS[i], cx - 140, y + cardH - 20);
+            menuFont.draw(game.batch, PAUSE_OPTS[i], cx - 140, y + 45);
 
             smallFont.setColor(0.5f, 0.5f, 0.6f, 1);
-            smallFont.draw(game.batch, PAUSE_DESC[i], cx - 140, y + 30);
+            smallFont.draw(game.batch, PAUSE_DESC[i], cx - 140, y + 17);
         }
 
         menuFont.setColor(Color.WHITE);
@@ -540,6 +589,8 @@ public class PlayingScreen extends ScreenAdapter {
             base = new Color(
                 base.r * 0.5f, Math.min(1f, base.g * 0.8f + 0.4f), base.b * 0.3f, 1f
             ); // green tint for ivy
+        } else if (block.isFrosted()) {
+            base = new Color(0.5f, 0.8f, 1f, 0.85f); // ice-blue semi-transparent for frosted
         }
 
         // Controlled block pulses slightly
@@ -554,27 +605,31 @@ public class PlayingScreen extends ScreenAdapter {
             shapeRenderer.setColor(base);
         }
 
+        float scale = block.getScale();
+        float tileSize = Block.TILE_SIZE * scale;
+        float halfTile = tileSize / 2f;
+
         for (Vector2 local : block.getLocalTilePositions()) {
             float wx = pos.x + local.x * cos - local.y * sin;
             float wy = pos.y + local.x * sin + local.y * cos;
             shapeRenderer.rect(
-                wx - RENDER_HALF, wy - RENDER_HALF,
-                RENDER_HALF, RENDER_HALF,
-                RENDER_TILE, RENDER_TILE,
+                wx - halfTile, wy - halfTile,
+                halfTile, halfTile,
+                tileSize, tileSize,
                 1, 1, deg);
         }
 
         // Inner highlight (lighter strip at top of each tile)
         tempColor.set(1, 1, 1, 0.15f);
         shapeRenderer.setColor(tempColor);
-        float highlightH = RENDER_TILE * 0.18f;
+        float highlightH = tileSize * 0.18f;
         for (Vector2 local : block.getLocalTilePositions()) {
             float wx = pos.x + local.x * cos - local.y * sin;
             float wy = pos.y + local.x * sin + local.y * cos;
             shapeRenderer.rect(
-                wx - RENDER_HALF, wy + RENDER_HALF - highlightH,
-                RENDER_HALF, RENDER_HALF,
-                RENDER_TILE, highlightH,
+                wx - halfTile, wy + halfTile - highlightH,
+                halfTile, halfTile,
+                tileSize, highlightH,
                 1, 1, deg);
         }
     }
@@ -585,13 +640,17 @@ public class PlayingScreen extends ScreenAdapter {
         float cos = MathUtils.cos(angle), sin = MathUtils.sin(angle);
         float deg = angle * MathUtils.radiansToDegrees;
 
+        float scale = block.getScale();
+        float tileSize = Block.TILE_SIZE * scale;
+        float halfTile = tileSize / 2f;
+
         for (Vector2 local : block.getLocalTilePositions()) {
             float wx = pos.x + local.x * cos - local.y * sin;
             float wy = pos.y + local.x * sin + local.y * cos;
             shapeRenderer.rect(
-                wx - RENDER_HALF, wy - RENDER_HALF,
-                RENDER_HALF, RENDER_HALF,
-                RENDER_TILE, RENDER_TILE,
+                wx - halfTile, wy - halfTile,
+                halfTile, halfTile,
+                tileSize, tileSize,
                 1, 1, deg);
         }
     }
@@ -644,13 +703,103 @@ public class PlayingScreen extends ScreenAdapter {
     }
 
     // ─── HUD ────────────────────────────────────────────────────────
-    private void drawHud() {
+    private void drawHudBackgrounds() {
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapeRenderer.setProjectionMatrix(hudCamera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+
+        float cardW = 350;
+        float cardH = 175;
+        float playLeft = (screenWidth - viewport.getScreenWidth()) / 2f;
+
+        if (playerCount == 1) {
+            float p1X = Math.max(20f, (playLeft - cardW) / 2f);
+            drawCardBackground(p1X, screenHeight - 195, cardW, cardH, players[0]);
+        } else {
+            float p1X = 20f;
+            float p2X = screenWidth - cardW - 20f;
+            drawCardBackground(p1X, screenHeight - 195, cardW, cardH, players[0]);
+            drawCardBackground(p2X, screenHeight - 195, cardW, cardH, players[1]);
+        }
+
+        shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void drawCardBackground(float x, float y, float w, float h, Player p) {
+        // Outer glowing border
+        shapeRenderer.setColor(0.45f, 0.35f, 0.85f, 0.5f);
+        shapeRenderer.rect(x - 2, y - 2, w + 4, h + 4);
+
+        // Inner card background
+        shapeRenderer.setColor(0.10f, 0.10f, 0.20f, 0.85f);
+        shapeRenderer.rect(x, y, w, h);
+
+        // Next block slot chamber (dark box)
+        float slotX = x + 245;
+        float slotY = y + 15;
+        float slotW = 90;
+        float slotH = 115;
+
+        shapeRenderer.setColor(0.45f, 0.35f, 0.85f, 0.3f);
+        shapeRenderer.rect(slotX - 1, slotY - 1, slotW + 2, slotH + 2);
+
+        shapeRenderer.setColor(0.06f, 0.06f, 0.12f, 0.9f);
+        shapeRenderer.rect(slotX, slotY, slotW, slotH);
+
+        // Render preview block tiles
+        BlockFactory factory = BlockFactory.getInstance();
+        int nextType = factory.peekNextType(p.getId());
+        Vector2[] offsets = factory.getShapeOffsets(nextType);
+        Color color = BLOCK_COLORS[nextType];
+
+        float tilePixel = 20f;
+        float centerX = slotX + slotW / 2f;
+        float centerY = slotY + slotH / 2f;
+
+        // Compute bounding box of offsets to center the shape perfectly
+        float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+        float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+        for (Vector2 off : offsets) {
+            if (off.x < minX) minX = off.x;
+            if (off.x > maxX) maxX = off.x;
+            if (off.y < minY) minY = off.y;
+            if (off.y > maxY) maxY = off.y;
+        }
+        float shapeCenterX = (minX + maxX) / 2f;
+        float shapeCenterY = (minY + maxY) / 2f;
+
+        shapeRenderer.setColor(color);
+        for (Vector2 off : offsets) {
+            float tx = centerX + (off.x - shapeCenterX) * tilePixel;
+            float ty = centerY + (off.y - shapeCenterY) * tilePixel;
+            shapeRenderer.rect(tx - tilePixel / 2f + 1, ty - tilePixel / 2f + 1, tilePixel - 2, tilePixel - 2);
+        }
+
+        // Outlines
+        shapeRenderer.end();
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(0, 0, 0, 0.5f);
+        for (Vector2 off : offsets) {
+            float tx = centerX + (off.x - shapeCenterX) * tilePixel;
+            float ty = centerY + (off.y - shapeCenterY) * tilePixel;
+            shapeRenderer.rect(tx - tilePixel / 2f + 1, ty - tilePixel / 2f + 1, tilePixel - 2, tilePixel - 2);
+        }
+        shapeRenderer.end();
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+    }
+
+    private void drawHudText() {
         float cx = screenWidth / 2f;
 
-        // Mode name
-        menuFont.draw(game.batch, strategy.getModeName(), cx - 80, screenHeight - 20);
+        // Mode name centered
+        menuFont.getData().setScale(0.8f);
+        glyphLayout.setText(menuFont, strategy.getModeName());
+        menuFont.draw(game.batch, strategy.getModeName(), cx - glyphLayout.width / 2f, screenHeight - 25);
+        menuFont.getData().setScale(1.0f);
 
-        // Timer
+        // Timer centered
         hudBuilder.setLength(0);
         if (strategy instanceof TimeAttackStrategy) {
             double remaining = Math.max(0, ((TimeAttackStrategy) strategy).getTimeLimit() - elapsedTime);
@@ -658,116 +807,94 @@ public class PlayingScreen extends ScreenAdapter {
         } else {
             hudBuilder.append(String.format("%.1f", elapsedTime)).append("s");
         }
-        smallFont.draw(game.batch, hudBuilder, cx - 30, screenHeight - 60);
+        smallFont.getData().setScale(0.9f);
+        glyphLayout.setText(smallFont, hudBuilder);
+        smallFont.draw(game.batch, hudBuilder, cx - glyphLayout.width / 2f, screenHeight - 60);
+        smallFont.getData().setScale(1.0f);
 
-        // Player panels
+        float cardW = 350;
+        float playLeft = (screenWidth - viewport.getScreenWidth()) / 2f;
+
+        // Draw Player Panels
         if (playerCount == 1) {
-            drawPlayerHud(players[0], 40, screenHeight - 20);
+            float p1X = Math.max(20f, (playLeft - cardW) / 2f);
+            drawPlayerHudText(players[0], p1X, screenHeight - 195);
         } else {
-            drawPlayerHud(players[0], 40, screenHeight - 20);
-            drawPlayerHud(players[1], screenWidth - 320, screenHeight - 20);
+            float p1X = 20f;
+            float p2X = screenWidth - cardW - 20f;
+            drawPlayerHudText(players[0], p1X, screenHeight - 195);
+            drawPlayerHudText(players[1], p2X, screenHeight - 195);
         }
-
-        // Next block preview (switches between batch and shape renderer internally)
-        drawNextBlockPreview();
     }
 
-    private void drawPlayerHud(Player p, float x, float y) {
-        // Lives as hearts
+    private void drawPlayerHudText(Player p, float cardX, float cardY) {
+        float sx = cardX + 15;
+
+        // Lives
         hudBuilder.setLength(0);
         hudBuilder.append("P").append(p.getId()).append("  ");
         for (int i = 0; i < p.getLives(); i++) hudBuilder.append("\u2665 ");
-        hudFont.draw(game.batch, hudBuilder, x, y);
+        hudFont.getData().setScale(0.85f);
+        hudFont.draw(game.batch, hudBuilder, sx, cardY + 145);
+        hudFont.getData().setScale(1.0f);
 
+        // Score
         hudBuilder.setLength(0);
         hudBuilder.append("Score: ").append(p.getScore());
-        smallFont.draw(game.batch, hudBuilder, x, y - 38);
+        smallFont.getData().setScale(0.85f);
+        smallFont.draw(game.batch, hudBuilder, sx, cardY + 115);
 
+        // Height
         hudBuilder.setLength(0);
         hudBuilder.append("Height: ").append(String.format("%.1f", p.getMaxHeight())).append("m");
-        smallFont.draw(game.batch, hudBuilder, x, y - 66);
+        smallFont.draw(game.batch, hudBuilder, sx, cardY + 88);
 
-        // Spell indicator
-        int playerIndex = p.getId() - 1;
-        Spell available = spellManager.getAvailableSpell(playerIndex);
-        if (available != null) {
-            hudBuilder.setLength(0);
-            String keyName = (playerIndex == 0) ? "[E]" : "[Num0]";
-            if (available.isLight()) {
-                smallFont.setColor(0.5f, 1f, 0.5f, 1f); // green for light
+        // Spell & Cooldown (Only in 2 Players mode)
+        if (playerCount == 2) {
+            int playerIndex = p.getId() - 1;
+            float cooldown = spellManager.getSpellCooldown(playerIndex);
+            if (cooldown > 0) {
+                hudBuilder.setLength(0);
+                hudBuilder.append("COOLDOWN: ").append(String.format("%.1f", cooldown)).append("s");
+                smallFont.setColor(0.7f, 0.7f, 0.7f, 0.8f);
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 61);
+                smallFont.setColor(Color.WHITE);
             } else {
-                smallFont.setColor(1f, 0.4f, 0.4f, 1f); // red for dark
+                Spell available = spellManager.getAvailableSpell(playerIndex);
+                if (available != null) {
+                    hudBuilder.setLength(0);
+                    String keyName = (playerIndex == 0) ? "[F]" : "[Num0]";
+                    smallFont.setColor(0.3f, 0.9f, 1.0f, 1f); // Glowing cyan for mystery magic
+                    hudBuilder.append(keyName).append(" MAGIC READY");
+                    smallFont.draw(game.batch, hudBuilder, sx, cardY + 61);
+                    smallFont.setColor(Color.WHITE);
+                } else {
+                    hudBuilder.setLength(0);
+                    hudBuilder.append("NO SPELL");
+                    smallFont.setColor(0.5f, 0.5f, 0.5f, 0.6f);
+                    smallFont.draw(game.batch, hudBuilder, sx, cardY + 61);
+                    smallFont.setColor(Color.WHITE);
+                }
             }
-            hudBuilder.append(keyName).append(" ").append(available.getName());
-            smallFont.draw(game.batch, hudBuilder, x, y - 94);
-            smallFont.setColor(Color.WHITE);
         }
 
-        // Active effects indicator
+        // Active Effects
         hudBuilder.setLength(0);
         if (p.isFrosted()) hudBuilder.append("ICE ");
         if (p.isSpedUp()) hudBuilder.append("FAST ");
         if (p.isWeighted()) hudBuilder.append("HEAVY ");
         if (hudBuilder.length() > 0) {
             smallFont.setColor(0.6f, 0.8f, 1f, 1f);
-            smallFont.draw(game.batch, hudBuilder, x, y - 118);
+            smallFont.draw(game.batch, hudBuilder, sx, cardY + 34);
             smallFont.setColor(Color.WHITE);
         }
-    }
 
-    // ─── Next Block Preview ─────────────────────────────────────────
-    private void drawNextBlockPreview() {
-        game.batch.end();
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        shapeRenderer.setProjectionMatrix(hudCamera.combined);
-
-        if (playerCount == 1) {
-            drawPreviewForPlayer(players[0], 40, screenHeight - 120);
-        } else {
-            drawPreviewForPlayer(players[0], 40, screenHeight - 120);
-            drawPreviewForPlayer(players[1], screenWidth - 200, screenHeight - 120);
-        }
-
-        Gdx.gl.glDisable(GL20.GL_BLEND);
-        game.batch.begin();
-    }
-
-    private void drawPreviewForPlayer(Player p, float px, float py) {
-        BlockFactory factory = BlockFactory.getInstance();
-        int nextType = factory.peekNextType(p.getId());
-        Vector2[] offsets = factory.getShapeOffsets(nextType);
-        Color color = BLOCK_COLORS[nextType];
-
-        // Label
-        game.batch.begin();
-        smallFont.draw(game.batch, "NEXT", px, py + 25);
-        game.batch.end();
-
-        // Draw preview tiles at a fixed pixel scale
-        float tilePixel = 22f;  // preview tile size in pixels
-        float centerX = px + 55;
-        float centerY = py - 40;
-
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(color);
-        for (Vector2 off : offsets) {
-            float tx = centerX + off.x * tilePixel;
-            float ty = centerY + off.y * tilePixel;
-            shapeRenderer.rect(tx - tilePixel / 2 + 1, ty - tilePixel / 2 + 1, tilePixel - 2, tilePixel - 2);
-        }
-        shapeRenderer.end();
-
-        // Outlines
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        shapeRenderer.setColor(0, 0, 0, 0.5f);
-        for (Vector2 off : offsets) {
-            float tx = centerX + off.x * tilePixel;
-            float ty = centerY + off.y * tilePixel;
-            shapeRenderer.rect(tx - tilePixel / 2 + 1, ty - tilePixel / 2 + 1, tilePixel - 2, tilePixel - 2);
-        }
-        shapeRenderer.end();
+        // NEXT block label centered over slot
+        float slotX = cardX + 245;
+        smallFont.getData().setScale(0.8f);
+        glyphLayout.setText(smallFont, "NEXT");
+        smallFont.draw(game.batch, "NEXT", slotX + 45f - glyphLayout.width / 2f, cardY + 148);
+        smallFont.getData().setScale(1.0f);
     }
 
     // ─── Countdown Overlay ──────────────────────────────────────────
@@ -918,6 +1045,7 @@ public class PlayingScreen extends ScreenAdapter {
 
     @Override
     public void hide() {
+        transitioning = true;
         blocksToSettle.clear();
         for (int i = 0; i < activeBlocks.size; i++) destroyAndFreeBlock(activeBlocks.get(i));
         activeBlocks.clear();

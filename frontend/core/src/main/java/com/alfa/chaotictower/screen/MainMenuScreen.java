@@ -18,6 +18,9 @@ public class MainMenuScreen extends ScreenAdapter {
     private final Main game;
     private ShapeRenderer shapes;
     private String typedName = "";
+    private String typedPassword = "";
+    private int activeFieldIndex = 0; // 0 = Username, 1 = Password, 2 = Mode Selector
+    private boolean isRegisterMode = false;
     private boolean isConnecting = false;
     private String errorMessage = "";
     private float time = 0;
@@ -42,41 +45,137 @@ public class MainMenuScreen extends ScreenAdapter {
 
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
+            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                if (isConnecting) return false;
+                
+                float w = Gdx.graphics.getWidth();
+                float h = Gdx.graphics.getHeight();
+                float cx = w / 2f;
+                
+                // Keep uBox/pBox/btn coordinates completely aligned with render()
+                float boxW = 520, boxH = 50;
+                float uBoxX = cx - boxW / 2, uBoxY = h / 2f + 10;
+                float pBoxX = cx - boxW / 2, pBoxY = h / 2f - 60;
+
+                float btnW = 240, btnH = 45;
+                float lBtnX = cx - btnW - 20, lBtnY = h / 2f - 135;
+                float rBtnX = cx + 20, rBtnY = h / 2f - 135;
+
+                // Convert screen coordinates
+                float clickX = screenX;
+                float clickY = h - screenY;
+
+                if (clickX >= uBoxX && clickX <= uBoxX + boxW && clickY >= uBoxY && clickY <= uBoxY + boxH) {
+                    activeFieldIndex = 0;
+                    return true;
+                } else if (clickX >= pBoxX && clickX <= pBoxX + boxW && clickY >= pBoxY && clickY <= pBoxY + boxH) {
+                    activeFieldIndex = 1;
+                    return true;
+                } else if (clickX >= lBtnX && clickX <= lBtnX + btnW && clickY >= lBtnY && clickY <= lBtnY + btnH) {
+                    activeFieldIndex = 2;
+                    isRegisterMode = false;
+                    if (typedName.trim().length() > 0 && typedPassword.length() > 0) {
+                        processSubmit();
+                    }
+                    return true;
+                } else if (clickX >= rBtnX && clickX <= rBtnX + btnW && clickY >= rBtnY && clickY <= rBtnY + btnH) {
+                    activeFieldIndex = 2;
+                    isRegisterMode = true;
+                    if (typedName.trim().length() > 0 && typedPassword.length() > 0) {
+                        processSubmit();
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public boolean keyDown(int keycode) {
+                if (isConnecting) return false;
+                if (keycode == com.badlogic.gdx.Input.Keys.TAB) {
+                    activeFieldIndex = (activeFieldIndex + 1) % 3;
+                    return true;
+                } else if (keycode == com.badlogic.gdx.Input.Keys.UP) {
+                    activeFieldIndex = (activeFieldIndex + 2) % 3;
+                    return true;
+                } else if (keycode == com.badlogic.gdx.Input.Keys.DOWN) {
+                    activeFieldIndex = (activeFieldIndex + 1) % 3;
+                    return true;
+                } else if (activeFieldIndex == 2) {
+                    if (keycode == com.badlogic.gdx.Input.Keys.LEFT || keycode == com.badlogic.gdx.Input.Keys.RIGHT) {
+                        isRegisterMode = !isRegisterMode;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
             public boolean keyTyped(char c) {
                 if (isConnecting) return false;
-                if (c == '\b' && typedName.length() > 0) {
-                    typedName = typedName.substring(0, typedName.length() - 1);
+                if (c == '\b') {
+                    if (activeFieldIndex == 0) {
+                        if (typedName.length() > 0) {
+                            typedName = typedName.substring(0, typedName.length() - 1);
+                        }
+                    } else if (activeFieldIndex == 1) {
+                        if (typedPassword.length() > 0) {
+                            typedPassword = typedPassword.substring(0, typedPassword.length() - 1);
+                        }
+                    }
                 } else if (c == '\r' || c == '\n') {
-                    if (typedName.trim().length() > 0) processLogin();
-                } else if (Character.isLetterOrDigit(c) && typedName.length() < 20) {
-                    typedName += c;
+                    if (activeFieldIndex == 0) {
+                        if (typedName.trim().length() > 0) activeFieldIndex = 1;
+                    } else if (activeFieldIndex == 1) {
+                        if (typedPassword.length() > 0) activeFieldIndex = 2;
+                    } else if (activeFieldIndex == 2) {
+                        if (typedName.trim().length() > 0 && typedPassword.length() > 0) {
+                            processSubmit();
+                        }
+                    }
+                } else if (c == '\t') {
+                    // Handled in keyDown
+                } else if (c >= 32 && c <= 126) {
+                    if (activeFieldIndex == 0) {
+                        if (typedName.length() < 20) typedName += c;
+                    } else if (activeFieldIndex == 1) {
+                        if (typedPassword.length() < 20) typedPassword += c;
+                    }
                 }
                 return true;
             }
         });
     }
 
-    private void processLogin() {
+    private void processSubmit() {
         isConnecting = true;
         errorMessage = "";
-        ApiClient.login(typedName.trim(), new ApiClient.ApiCallback() {
+
+        ApiClient.ApiCallback callback = new ApiClient.ApiCallback() {
             @Override
             public void onSuccess(JsonValue result) {
                 long id = result.getLong("id");
                 Gdx.app.postRunnable(() -> game.setScreen(new ModeSelectScreen(game, id)));
             }
+
             @Override
             public void onFailure(Throwable t) {
                 Gdx.app.postRunnable(() -> {
                     isConnecting = false;
                     if (t.getMessage() != null && !t.getMessage().isEmpty()) {
-                        errorMessage = "Error: " + t.getMessage();
+                        errorMessage = t.getMessage();
                     } else {
                         errorMessage = "Connection failed. Is the server running?";
                     }
                 });
             }
-        });
+        };
+
+        if (isRegisterMode) {
+            ApiClient.register(typedName.trim(), typedPassword, callback);
+        } else {
+            ApiClient.login(typedName.trim(), typedPassword, callback);
+        }
     }
 
     @Override
@@ -90,53 +189,157 @@ public class MainMenuScreen extends ScreenAdapter {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-        // Background gradient
+        // Apply temporary dynamic scales to fonts for clean multi-resolution fit
+        titleFont.getData().setScale(0.8f);
+        menuFont.getData().setScale(0.65f);
+        smallFont.getData().setScale(0.7f);
+
+        // UI layout and coordinates optimized for 1280x720 window
+        float boxW = 520, boxH = 50;
+        float uBoxX = cx - boxW / 2, uBoxY = h / 2f + 10;
+        float pBoxX = cx - boxW / 2, pBoxY = h / 2f - 60;
+
+        float btnW = 240, btnH = 45;
+        float lBtnX = cx - btnW - 20, lBtnY = h / 2f - 135;
+        float rBtnX = cx + 20, rBtnY = h / 2f - 135;
+
         shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(BG_BOT.r, BG_BOT.g, BG_BOT.b, 1.0f); // background solid
         shapes.rect(0, 0, w, h, BG_BOT, BG_BOT, BG_TOP, BG_TOP);
 
         // Decorative floating blocks
         drawDecoBlocks(w, h);
 
-        // Input field box
-        float boxW = 500, boxH = 55;
-        float boxX = cx - boxW / 2, boxY = h / 2f - 50;
-        shapes.setColor(0.12f, 0.12f, 0.22f, 0.85f);
-        shapes.rect(boxX, boxY, boxW, boxH);
-        shapes.setColor(0.35f, 0.30f, 0.65f, 0.7f);
-        shapes.rect(boxX, boxY, boxW, 3); // bottom edge
-        shapes.rect(boxX, boxY + boxH - 2, boxW, 2); // top edge
+        // Username Box: Filled background
+        shapes.setColor(0.16f, 0.16f, 0.28f, 0.9f);
+        shapes.rect(uBoxX, uBoxY, boxW, boxH);
+        // Username Box: Glowing cyan active focus or soft inactive purple border
+        if (activeFieldIndex == 0) {
+            shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f);
+        } else {
+            shapes.setColor(0.25f, 0.20f, 0.45f, 0.5f);
+        }
+        shapes.rect(uBoxX, uBoxY, boxW, 2); // bottom
+        shapes.rect(uBoxX, uBoxY + boxH - 2, boxW, 2); // top
+        shapes.rect(uBoxX, uBoxY, 2, boxH); // left
+        shapes.rect(uBoxX + boxW - 2, uBoxY, 2, boxH); // right
+
+        // Password Box: Filled background
+        shapes.setColor(0.16f, 0.16f, 0.28f, 0.9f);
+        shapes.rect(pBoxX, pBoxY, boxW, boxH);
+        // Password Box: Glowing cyan active focus or soft inactive purple border
+        if (activeFieldIndex == 1) {
+            shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f);
+        } else {
+            shapes.setColor(0.25f, 0.20f, 0.45f, 0.5f);
+        }
+        shapes.rect(pBoxX, pBoxY, boxW, 2); // bottom
+        shapes.rect(pBoxX, pBoxY + boxH - 2, boxW, 2); // top
+        shapes.rect(pBoxX, pBoxY, 2, boxH); // left
+        shapes.rect(pBoxX + boxW - 2, pBoxY, 2, boxH); // right
+
+        // Mode Selector: LOGIN button box
+        shapes.setColor(0.16f, 0.16f, 0.28f, 0.9f);
+        shapes.rect(lBtnX, lBtnY, btnW, btnH);
+        if (!isRegisterMode) {
+            if (activeFieldIndex == 2) {
+                shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f); // Active focused
+            } else {
+                shapes.setColor(0.35f, 0.30f, 0.65f, 0.9f); // Selected
+            }
+        } else {
+            shapes.setColor(0.20f, 0.20f, 0.30f, 0.3f); // Unselected
+        }
+        shapes.rect(lBtnX, lBtnY, btnW, 2);
+        shapes.rect(lBtnX, lBtnY + btnH - 2, btnW, 2);
+        shapes.rect(lBtnX, lBtnY, 2, btnH);
+        shapes.rect(lBtnX + btnW - 2, lBtnY, 2, btnH);
+
+        // Mode Selector: REGISTER button box
+        shapes.setColor(0.16f, 0.16f, 0.28f, 0.9f);
+        shapes.rect(rBtnX, rBtnY, btnW, btnH);
+        if (isRegisterMode) {
+            if (activeFieldIndex == 2) {
+                shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f); // Active focused
+            } else {
+                shapes.setColor(0.35f, 0.30f, 0.65f, 0.9f); // Selected
+            }
+        } else {
+            shapes.setColor(0.20f, 0.20f, 0.30f, 0.3f); // Unselected
+        }
+        shapes.rect(rBtnX, rBtnY, btnW, 2);
+        shapes.rect(rBtnX, rBtnY + btnH - 2, btnW, 2);
+        shapes.rect(rBtnX, rBtnY, 2, btnH);
+        shapes.rect(rBtnX + btnW - 2, rBtnY, 2, btnH);
 
         shapes.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // Text
+        // Text rendering pass
         game.batch.begin();
 
         // Title with subtle vertical bob
         float bob = 6f * (float) Math.sin(time * 1.5);
         glyphLayout.setText(titleFont, "CHAOTIC TOWER");
-        titleFont.draw(game.batch, "CHAOTIC TOWER", cx - glyphLayout.width / 2, h - 180 + bob);
+        titleFont.draw(game.batch, "CHAOTIC TOWER", cx - glyphLayout.width / 2, h - 140 + bob);
 
         if (isConnecting) {
-            glyphLayout.setText(menuFont, "Connecting to server...");
-            menuFont.draw(game.batch, "Connecting to server...", cx - glyphLayout.width / 2, h / 2f + 50);
+            glyphLayout.setText(menuFont, isRegisterMode ? "Registering account..." : "Logging in to server...");
+            menuFont.draw(game.batch, isRegisterMode ? "Registering account..." : "Logging in to server...", cx - glyphLayout.width / 2, h / 2f + 95);
         } else {
-            glyphLayout.setText(smallFont, "Enter your Username & Press Enter");
-            smallFont.draw(game.batch, "Enter your Username & Press Enter", cx - glyphLayout.width / 2, h / 2f + 40);
+            glyphLayout.setText(smallFont, "TAB/Arrow keys to navigate field focus. Press ENTER to submit.");
+            smallFont.draw(game.batch, "TAB/Arrow keys to navigate field focus. Press ENTER to submit.", cx - glyphLayout.width / 2, h / 2f + 95);
 
-            // Cursor blink
-            String cursor = ((int)(time * 2) % 2 == 0) ? "_" : "";
-            menuFont.draw(game.batch, "> " + typedName + cursor, boxX + 15, boxY + boxH - 12);
+            // Username text
+            String uCursor = (activeFieldIndex == 0 && (int)(time * 2) % 2 == 0) ? "_" : "";
+            String uText = "User: " + typedName + uCursor;
+            glyphLayout.setText(menuFont, uText);
+            menuFont.draw(game.batch, uText, uBoxX + 15, uBoxY + boxH / 2f + glyphLayout.height / 2f - 2f);
 
+            // Password text
+            String pCursor = (activeFieldIndex == 1 && (int)(time * 2) % 2 == 0) ? "_" : "";
+            String masked = "*".repeat(typedPassword.length());
+            String pText = "Pass: " + masked + pCursor;
+            glyphLayout.setText(menuFont, pText);
+            menuFont.draw(game.batch, pText, pBoxX + 15, pBoxY + boxH / 2f + glyphLayout.height / 2f - 2f);
+
+            // Mode LOGIN button label
+            String lBtnText = "LOGIN";
+            glyphLayout.setText(menuFont, lBtnText);
+            if (!isRegisterMode) {
+                menuFont.setColor(0.3f, 0.9f, 1.0f, 1f);
+            } else {
+                menuFont.setColor(0.5f, 0.5f, 0.6f, 0.7f);
+            }
+            menuFont.draw(game.batch, lBtnText, lBtnX + btnW / 2f - glyphLayout.width / 2f, lBtnY + btnH / 2f + glyphLayout.height / 2f - 2f);
+            menuFont.setColor(Color.WHITE);
+
+            // Mode REGISTER button label
+            String rBtnText = "REGISTER";
+            glyphLayout.setText(menuFont, rBtnText);
+            if (isRegisterMode) {
+                menuFont.setColor(0.3f, 0.9f, 1.0f, 1f);
+            } else {
+                menuFont.setColor(0.5f, 0.5f, 0.6f, 0.7f);
+            }
+            menuFont.draw(game.batch, rBtnText, rBtnX + btnW / 2f - glyphLayout.width / 2f, rBtnY + btnH / 2f + glyphLayout.height / 2f - 2f);
+            menuFont.setColor(Color.WHITE);
+
+            // Error display
             if (errorMessage.length() > 0) {
                 smallFont.setColor(1f, 0.4f, 0.4f, 1);
                 glyphLayout.setText(smallFont, errorMessage);
-                smallFont.draw(game.batch, errorMessage, cx - glyphLayout.width / 2, boxY - 25);
+                smallFont.draw(game.batch, errorMessage, cx - glyphLayout.width / 2, lBtnY - 30);
                 smallFont.setColor(Color.WHITE);
             }
         }
 
         game.batch.end();
+
+        // Reset scales to prevent affecting other screens
+        titleFont.getData().setScale(1.0f);
+        menuFont.getData().setScale(1.0f);
+        smallFont.getData().setScale(1.0f);
     }
 
     private void drawDecoBlocks(float w, float h) {

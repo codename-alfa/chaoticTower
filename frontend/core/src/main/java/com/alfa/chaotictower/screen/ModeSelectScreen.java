@@ -30,7 +30,7 @@ public class ModeSelectScreen extends ScreenAdapter {
     private static final String[] SP_MODES = {"Survival", "Time Attack", "Puzzle"};
     private static final String[] MP_MODES = {"Survival", "Race", "Puzzle"};
     private static final String[] SP_DESC = {
-        "Build as high as you can with 3 lives!",
+        "Build high with 3 lives!",
         "Reach 20m height within 2 minutes!",
         "Fit blocks below the laser line!"
     };
@@ -85,8 +85,10 @@ public class ModeSelectScreen extends ScreenAdapter {
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
         game.batch.begin();
+        titleFont.getData().setScale(0.75f);
         glyph.setText(titleFont, "SELECT MODE");
-        titleFont.draw(game.batch, "SELECT MODE", cx - glyph.width / 2, h - 80);
+        titleFont.draw(game.batch, "SELECT MODE", cx - glyph.width / 2, h - 60);
+        titleFont.getData().setScale(1.0f);
 
         if (selectionStep == 0) {
             drawPlayerText(cx, h);
@@ -94,8 +96,10 @@ public class ModeSelectScreen extends ScreenAdapter {
             drawModeText(cx, h);
         }
 
+        smallFont.getData().setScale(0.85f);
         glyph.setText(smallFont, "[ENTER] Select     [ESC] Back");
-        smallFont.draw(game.batch, "[ENTER] Select     [ESC] Back", cx - glyph.width / 2, 50);
+        smallFont.draw(game.batch, "[ENTER] Select     [ESC] Back", cx - glyph.width / 2, 55);
+        smallFont.getData().setScale(1.0f);
         game.batch.end();
 
         handleInput();
@@ -103,9 +107,9 @@ public class ModeSelectScreen extends ScreenAdapter {
 
     // ── Player count cards ─────────────────────────────────
     private void drawPlayerCards(float cx, float h) {
-        float cardW = 360, cardH = 100, gap = 30;
+        float cardW = 540, cardH = 110, gap = 25;
         float totalH = cardH * 2 + gap;
-        float startY = h / 2f + totalH / 2f - 60;
+        float startY = h / 2f + totalH / 2f - 65;
 
         for (int i = 0; i < 2; i++) {
             float y = startY - i * (cardH + gap);
@@ -120,24 +124,31 @@ public class ModeSelectScreen extends ScreenAdapter {
     }
 
     private void drawPlayerText(float cx, float h) {
-        float cardH = 100, gap = 30;
+        float cardW = 540, cardH = 110, gap = 25;
         float totalH = cardH * 2 + gap;
-        float startY = h / 2f + totalH / 2f - 60;
+        float startY = h / 2f + totalH / 2f - 65;
 
+        smallFont.getData().setScale(0.9f);
         glyph.setText(smallFont, "Choose Player Count");
-        smallFont.draw(game.batch, "Choose Player Count", cx - glyph.width / 2, startY + cardH + 35);
+        smallFont.draw(game.batch, "Choose Player Count", cx - glyph.width / 2, h - 115);
+        smallFont.getData().setScale(1.0f);
 
         String[] labels = {"1 PLAYER", "2 PLAYERS"};
         String[] descs = {"Single player challenge", "Local multiplayer"};
+
+        menuFont.getData().setScale(0.75f);
+        smallFont.getData().setScale(0.7f);
         for (int i = 0; i < 2; i++) {
             float y = startY - i * (cardH + gap);
             boolean sel = (i == 0 && playerCount == 1) || (i == 1 && playerCount == 2);
             if (sel) menuFont.setColor(Color.WHITE);
             else menuFont.setColor(0.6f, 0.6f, 0.7f, 1);
-            menuFont.draw(game.batch, labels[i], cx - 140, y + cardH - 25);
+            menuFont.draw(game.batch, labels[i], cx - 235, y + 68);
             smallFont.setColor(0.5f, 0.5f, 0.6f, 1);
-            smallFont.draw(game.batch, descs[i], cx - 140, y + 30);
+            smallFont.draw(game.batch, descs[i], cx - 235, y + 28);
         }
+        menuFont.getData().setScale(1.0f);
+        smallFont.getData().setScale(1.0f);
         menuFont.setColor(Color.WHITE);
         smallFont.setColor(Color.WHITE);
     }
@@ -145,9 +156,9 @@ public class ModeSelectScreen extends ScreenAdapter {
     // ── Game mode cards ────────────────────────────────────
     private void drawModeCards(float cx, float h) {
         String[] modes = (playerCount == 1) ? SP_MODES : MP_MODES;
-        float cardW = 420, cardH = 110, gap = 25;
+        float cardW = 620, cardH = 110, gap = 20;
         float totalH = modes.length * cardH + (modes.length - 1) * gap;
-        float startY = h / 2f + totalH / 2f - 50;
+        float startY = h / 2f + totalH / 2f - 105;
 
         for (int i = 0; i < modes.length; i++) {
             float y = startY - i * (cardH + gap);
@@ -164,34 +175,76 @@ public class ModeSelectScreen extends ScreenAdapter {
     private void drawModeText(float cx, float h) {
         String[] modes = (playerCount == 1) ? SP_MODES : MP_MODES;
         String[] descs = (playerCount == 1) ? SP_DESC : MP_DESC;
-        float cardH = 110, gap = 25;
+        float cardW = 620, cardH = 110, gap = 20;
         float totalH = modes.length * cardH + (modes.length - 1) * gap;
-        float startY = h / 2f + totalH / 2f - 50;
+        float startY = h / 2f + totalH / 2f - 105;
 
+        smallFont.getData().setScale(0.9f);
         glyph.setText(smallFont, playerCount + "P - Choose Game Mode");
-        smallFont.draw(game.batch, playerCount + "P - Choose Game Mode", cx - glyph.width / 2, startY + cardH + 35);
+        smallFont.draw(game.batch, playerCount + "P - Choose Game Mode", cx - glyph.width / 2, h - 115);
+        smallFont.getData().setScale(1.0f);
 
+        menuFont.getData().setScale(0.75f);
+        smallFont.getData().setScale(0.7f);
         for (int i = 0; i < modes.length; i++) {
             float y = startY - i * (cardH + gap);
             boolean sel = (i == modeIndex);
             if (sel) menuFont.setColor(Color.WHITE);
             else menuFont.setColor(0.6f, 0.6f, 0.7f, 1);
-            menuFont.draw(game.batch, modes[i], cx - 180, y + cardH - 25);
+            menuFont.draw(game.batch, modes[i], cx - 275, y + 68);
             smallFont.setColor(0.5f, 0.5f, 0.6f, 1);
-            smallFont.draw(game.batch, descs[i], cx - 180, y + 35);
+            smallFont.draw(game.batch, descs[i], cx - 275, y + 28);
         }
+        menuFont.getData().setScale(1.0f);
+        smallFont.getData().setScale(1.0f);
         menuFont.setColor(Color.WHITE);
         smallFont.setColor(Color.WHITE);
     }
 
     // ── Input ──────────────────────────────────────────────
     private void handleInput() {
+        float w = Gdx.graphics.getWidth(), h = Gdx.graphics.getHeight();
+        float cx = w / 2f;
+        float mouseX = Gdx.input.getX();
+        float mouseY = h - Gdx.input.getY();
+
         if (selectionStep == 0) {
+            float cardW = 540, cardH = 110, gap = 25;
+            float totalH = cardH * 2 + gap;
+            float startY = h / 2f + totalH / 2f - 65;
+
+            for (int i = 0; i < 2; i++) {
+                float y = startY - i * (cardH + gap);
+                if (mouseX >= cx - cardW / 2 && mouseX <= cx + cardW / 2 && mouseY >= y && mouseY <= y + cardH) {
+                    playerCount = i + 1;
+                    if (Gdx.input.justTouched()) {
+                        selectionStep = 1;
+                        modeIndex = 0;
+                        return;
+                    }
+                }
+            }
+
             if (Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W)) playerCount = 1;
             if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || Gdx.input.isKeyJustPressed(Input.Keys.S)) playerCount = 2;
             if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) { selectionStep = 1; modeIndex = 0; }
         } else {
             String[] modes = (playerCount == 1) ? SP_MODES : MP_MODES;
+            float cardW = 620, cardH = 110, gap = 20;
+            float totalH = modes.length * cardH + (modes.length - 1) * gap;
+            float startY = h / 2f + totalH / 2f - 105;
+
+            for (int i = 0; i < modes.length; i++) {
+                float y = startY - i * (cardH + gap);
+                if (mouseX >= cx - cardW / 2 && mouseX <= cx + cardW / 2 && mouseY >= y && mouseY <= y + cardH) {
+                    modeIndex = i;
+                    if (Gdx.input.justTouched()) {
+                        launchGame(modes[modeIndex]);
+                        return;
+                    }
+                }
+            }
+
             if (Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W)) modeIndex = Math.max(0, modeIndex - 1);
             if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || Gdx.input.isKeyJustPressed(Input.Keys.S)) modeIndex = Math.min(modes.length - 1, modeIndex + 1);
             if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) launchGame(modes[modeIndex]);
