@@ -2,6 +2,8 @@
 FROM eclipse-temurin:17-jdk-alpine AS build
 WORKDIR /app
 COPY . .
+# Add execute permission to gradlew script
+RUN chmod +x gradlew
 # Running compile without daemon
 RUN ./gradlew bootJar --no-daemon
 
