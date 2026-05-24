@@ -11,6 +11,7 @@ import com.alfa.chaotictower.strategy.RaceStrategy;
 import com.alfa.chaotictower.strategy.TimeAttackStrategy;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -43,7 +44,7 @@ public class PlayingScreen extends ScreenAdapter {
     private ShapeRenderer shapeRenderer;
     private OrthographicCamera camera;
     private FitViewport viewport;
-    private final Array<Block> activeBlocks   = new Array<>();
+    private final Array<Block> activeBlocks = new Array<>();
     private final Array<Block> blocksToSettle = new Array<>();
 
     private Player[] players;
@@ -63,63 +64,64 @@ public class PlayingScreen extends ScreenAdapter {
     private double elapsedTime = 0.0;
     private BitmapFont titleFont;
 
-    // ─── Countdown ──────────────────────────────────────────────────
+    
     private static final float COUNTDOWN_DURATION = 3.0f;
     private float countdownTimer = COUNTDOWN_DURATION;
     private boolean countdownDone = false;
     private final GlyphLayout glyphLayout = new GlyphLayout();
 
-    // ─── Magic Spell System ──────────────────────────────────────
+    
     private SpellManager spellManager;
+    private Sound spellCastSound;
     private static final int[] SPELL_CAST_KEYS = { Input.Keys.F, Input.Keys.NUMPAD_0 };
 
-    // ─── Camera Follow ───────────────────────────────────────────
+    
     private static final float CAMERA_LERP_SPEED = 2.5f;
-    private static final float MIN_CAMERA_Y = 15f; // half of viewport height 30
+    private static final float MIN_CAMERA_Y = 15f; 
     private boolean transitioning = false;
 
-    // ─── Physics constants ──────────────────────────────────────────
-    private static final float WORLD_GRAVITY           = -6.0f;
-    private static final int   STEP_VEL_ITERATIONS     = 10;
-    private static final int   STEP_POS_ITERATIONS     = 8;
+    
+    private static final float WORLD_GRAVITY = -6.0f;
+    private static final int STEP_VEL_ITERATIONS = 10;
+    private static final int STEP_POS_ITERATIONS = 8;
     private static final float LANDING_NORMAL_THRESHOLD = 0.4f;
-    private static final float PEDESTAL_Y    = 2f;
+    private static final float PEDESTAL_Y = 2f;
     private static final float PEDESTAL_HALF = 1f;
 
-    // ─── Render constants ───────────────────────────────────────────
+    
     private static final float RENDER_TILE = Block.TILE_SIZE;
     private static final float RENDER_HALF = RENDER_TILE / 2f;
 
     private static final Color CARD_BG = new Color(0.10f, 0.10f, 0.20f, 0.85f);
     private static final Color CARD_SEL = new Color(0.18f, 0.15f, 0.35f, 0.95f);
     private static final Color ACCENT = new Color(0.45f, 0.35f, 0.85f, 1);
-    
+
     private int pauseSelectedIndex = 0;
-    private static final String[] PAUSE_OPTS = {"Resume Game", "Quit to Menu"};
-    private static final String[] PAUSE_DESC = {"Continue playing", "Return to mode selection"};
+    private static final String[] PAUSE_OPTS = { "Resume", "Menu", "Restart" };
+    private static final String[] PAUSE_DESC = { "", "", "" };
 
     private static final Color[] BLOCK_COLORS = {
-        new Color(0.95f, 0.90f, 0.20f, 1),  // O — Yellow
-        new Color(0.20f, 0.90f, 0.95f, 1),  // I — Cyan
-        new Color(0.70f, 0.25f, 0.95f, 1),  // T — Purple
-        new Color(0.95f, 0.60f, 0.15f, 1),  // L — Orange
-        new Color(0.20f, 0.35f, 0.95f, 1),  // J — Blue
-        new Color(0.25f, 0.90f, 0.30f, 1),  // S — Green
-        new Color(0.95f, 0.20f, 0.25f, 1),  // Z — Red
+            new Color(0.95f, 0.90f, 0.20f, 1), 
+            new Color(0.20f, 0.90f, 0.95f, 1), 
+            new Color(0.70f, 0.25f, 0.95f, 1), 
+            new Color(0.95f, 0.60f, 0.15f, 1), 
+            new Color(0.20f, 0.35f, 0.95f, 1), 
+            new Color(0.25f, 0.90f, 0.30f, 1), 
+            new Color(0.95f, 0.20f, 0.25f, 1), 
     };
 
-    private static final Color BG_BOTTOM   = new Color(0.03f, 0.03f, 0.06f, 1);
-    private static final Color BG_TOP      = new Color(0.06f, 0.06f, 0.16f, 1);
-    private static final Color PEDESTAL_C  = new Color(0.30f, 0.32f, 0.38f, 1);
-    private static final Color PEDESTAL_T  = new Color(0.42f, 0.44f, 0.50f, 1);
-    private static final Color WALL_COLOR  = new Color(0.18f, 0.20f, 0.28f, 1);
-    private static final Color DIVIDER_C   = new Color(0.15f, 0.20f, 0.35f, 0.8f);
-    private static final Color GRID_COLOR  = new Color(1f, 1f, 1f, 0.03f);
-    private static final Color OUTLINE_C   = new Color(0f, 0f, 0f, 0.6f);
+    private static final Color BG_BOTTOM = new Color(0.03f, 0.03f, 0.06f, 1);
+    private static final Color BG_TOP = new Color(0.06f, 0.06f, 0.16f, 1);
+    private static final Color PEDESTAL_C = new Color(0.30f, 0.32f, 0.38f, 1);
+    private static final Color PEDESTAL_T = new Color(0.42f, 0.44f, 0.50f, 1);
+    private static final Color WALL_COLOR = new Color(0.18f, 0.20f, 0.28f, 1);
+    private static final Color DIVIDER_C = new Color(0.15f, 0.20f, 0.35f, 0.8f);
+    private static final Color GRID_COLOR = new Color(1f, 1f, 1f, 0.03f);
+    private static final Color OUTLINE_C = new Color(0f, 0f, 0f, 0.6f);
 
     private final Color tempColor = new Color();
 
-    // ─── Constructors ───────────────────────────────────────────────
+    
     public PlayingScreen(Main game) {
         this(game, 2, new com.alfa.chaotictower.strategy.SurvivalStrategy());
     }
@@ -130,7 +132,7 @@ public class PlayingScreen extends ScreenAdapter {
         this.strategy = strategy;
     }
 
-    // ─── Lifecycle ──────────────────────────────────────────────────
+    
     @Override
     public void show() {
         Box2D.init();
@@ -142,7 +144,7 @@ public class PlayingScreen extends ScreenAdapter {
         float vw = (playerCount == 1) ? 20 : 40;
         viewport = new FitViewport(vw, 30, camera);
 
-        screenWidth  = Gdx.graphics.getWidth();
+        screenWidth = Gdx.graphics.getWidth();
         screenHeight = Gdx.graphics.getHeight();
 
         hudCamera = new OrthographicCamera();
@@ -150,35 +152,35 @@ public class PlayingScreen extends ScreenAdapter {
         hudCamera.update();
 
         GameAssetManager assets = GameAssetManager.getInstance();
-        hudFont   = assets.getFont(GameAssetManager.FONT_HUD);
+        hudFont = assets.getFont(GameAssetManager.FONT_HUD);
         smallFont = assets.getFont(GameAssetManager.FONT_SMALL);
-        menuFont  = assets.getFont(GameAssetManager.FONT_MENU);
+        menuFont = assets.getFont(GameAssetManager.FONT_MENU);
         titleFont = assets.getFont(GameAssetManager.FONT_TITLE);
 
         int lives = strategy.getInitialLives();
         if (playerCount == 1) {
-            players = new Player[]{new Player(1, 10, 28, lives)};
-            inputHandlers = new InputHandler[]{
-                new InputHandler(Input.Keys.A, Input.Keys.D, Input.Keys.S, Input.Keys.W)
+            players = new Player[] { new Player(1, 10, 28, lives) };
+            inputHandlers = new InputHandler[] {
+                    new InputHandler(Input.Keys.A, Input.Keys.D, Input.Keys.S, Input.Keys.W)
             };
         } else {
-            players = new Player[]{
-                new Player(1, 10, 28, lives),
-                new Player(2, 30, 28, lives)
+            players = new Player[] {
+                    new Player(1, 10, 28, lives),
+                    new Player(2, 30, 28, lives)
             };
-            inputHandlers = new InputHandler[]{
-                new InputHandler(Input.Keys.A, Input.Keys.D, Input.Keys.S, Input.Keys.W),
-                new InputHandler(Input.Keys.LEFT, Input.Keys.RIGHT, Input.Keys.DOWN, Input.Keys.UP)
+            inputHandlers = new InputHandler[] {
+                    new InputHandler(Input.Keys.A, Input.Keys.D, Input.Keys.S, Input.Keys.W),
+                    new InputHandler(Input.Keys.LEFT, Input.Keys.RIGHT, Input.Keys.DOWN, Input.Keys.UP)
             };
         }
 
         createEnvironment();
         setupContactListener();
 
-        // Reset the 7-bag randomizer for a fresh game
+        
         BlockFactory.getInstance().resetBags();
 
-        // Initialize spell system
+        
         spellManager = new SpellManager(playerCount);
         spellManager.registerLightSpell(new CementSpell());
         spellManager.registerLightSpell(new IvySpell());
@@ -187,22 +189,36 @@ public class PlayingScreen extends ScreenAdapter {
         spellManager.registerDarkSpell(new WeightSpell());
         spellManager.registerDarkSpell(new SpeedUpSpell());
 
-        // Don't spawn blocks yet — wait for countdown to finish
+        try {
+            spellCastSound = Gdx.audio.newSound(Gdx.files.internal("Re_Zero.mp3"));
+        } catch (Exception e) {
+            Gdx.app.error("PlayingScreen", "Could not load magic SFX 'Re_Zero.mp3': " + e.getMessage());
+        }
+
+        
         countdownTimer = COUNTDOWN_DURATION;
         countdownDone = false;
     }
 
-    // ─── Contact Listener ───────────────────────────────────────────
+    
     private void setupContactListener() {
         world.setContactListener(new ContactListener() {
-            @Override public void beginContact(Contact contact) { checkLanding(contact); }
-            @Override public void endContact(Contact contact) {}
+            @Override
+            public void beginContact(Contact contact) {
+                checkLanding(contact);
+            }
+
+            @Override
+            public void endContact(Contact contact) {
+            }
+
             @Override
             public void preSolve(Contact contact, Manifold oldManifold) {
                 Fixture fa = contact.getFixtureA();
                 Fixture fb = contact.getFixtureB();
                 Block controlled = getControlledBlock(fa);
-                if (controlled == null) controlled = getControlledBlock(fb);
+                if (controlled == null)
+                    controlled = getControlledBlock(fb);
 
                 if (controlled != null) {
                     if (controlled.isFrosted()) {
@@ -213,11 +229,14 @@ public class PlayingScreen extends ScreenAdapter {
                     }
                 }
             }
-            @Override public void postSolve(Contact contact, ContactImpulse impulse) {}
+
+            @Override
+            public void postSolve(Contact contact, ContactImpulse impulse) {
+            }
         });
     }
 
-    // ─── Environment ────────────────────────────────────────────────
+    
     private void createEnvironment() {
         if (playerCount == 1) {
             createStaticBox(10, PEDESTAL_Y, 2.5f, PEDESTAL_HALF, 1.0f);
@@ -227,13 +246,19 @@ public class PlayingScreen extends ScreenAdapter {
             createStaticBox(10, PEDESTAL_Y, 2.5f, PEDESTAL_HALF, 1.0f);
             createStaticBox(30, PEDESTAL_Y, 2.5f, PEDESTAL_HALF, 1.0f);
 
-            BodyDef dd = new BodyDef(); dd.position.set(20, 15);
+            BodyDef dd = new BodyDef();
+            dd.position.set(20, 15);
             Body db = world.createBody(dd);
-            PolygonShape ds = new PolygonShape(); ds.setAsBox(0.1f, 15);
-            FixtureDef df = new FixtureDef(); df.shape = ds; df.friction = 0f;
-            db.createFixture(df); ds.dispose();
+            PolygonShape ds = new PolygonShape();
+            ds.setAsBox(0.1f, 15);
+            FixtureDef df = new FixtureDef();
+            df.shape = ds;
+            df.friction = 0f;
+            db.createFixture(df);
+            ds.dispose();
 
-            PolygonShape ws = new PolygonShape(); ws.setAsBox(0.1f, 15);
+            PolygonShape ws = new PolygonShape();
+            ws.setAsBox(0.1f, 15);
             createStaticBoxShape(2.5f, 15, ws);
             createStaticBoxShape(17.5f, 15, ws);
             createStaticBoxShape(22.5f, 15, ws);
@@ -243,28 +268,36 @@ public class PlayingScreen extends ScreenAdapter {
     }
 
     private void createStaticBox(float x, float y, float hw, float hh, float friction) {
-        BodyDef bd = new BodyDef(); bd.position.set(x, y);
+        BodyDef bd = new BodyDef();
+        bd.position.set(x, y);
         Body b = world.createBody(bd);
-        PolygonShape s = new PolygonShape(); s.setAsBox(hw, hh);
-        FixtureDef fd = new FixtureDef(); fd.shape = s; fd.friction = friction;
-        b.createFixture(fd); s.dispose();
+        PolygonShape s = new PolygonShape();
+        s.setAsBox(hw, hh);
+        FixtureDef fd = new FixtureDef();
+        fd.shape = s;
+        fd.friction = friction;
+        b.createFixture(fd);
+        s.dispose();
     }
 
     private void createStaticBoxShape(float x, float y, PolygonShape shape) {
-        BodyDef bd = new BodyDef(); bd.position.set(x, y);
+        BodyDef bd = new BodyDef();
+        bd.position.set(x, y);
         world.createBody(bd).createFixture(shape, 0f);
     }
 
     private void spawnForPlayer(Player player) {
-        player.spawnNewBlock(world);
+        boolean isPuzzle = (strategy instanceof PuzzleStrategy);
+        player.spawnNewBlock(world, isPuzzle);
         activeBlocks.add(player.getCurrentBlock());
     }
 
-    // ─── Collision helpers ──────────────────────────────────────────
+    
     private boolean isFixtureControlled(Fixture f) {
         for (Player p : players) {
             Block b = p.getCurrentBlock();
-            if (b != null && f.getBody() == b.body) return true;
+            if (b != null && f.getBody() == b.body)
+                return true;
         }
         return false;
     }
@@ -272,41 +305,47 @@ public class PlayingScreen extends ScreenAdapter {
     private Block getControlledBlock(Fixture f) {
         for (Player p : players) {
             Block b = p.getCurrentBlock();
-            if (b != null && f.getBody() == b.body) return b;
+            if (b != null && f.getBody() == b.body)
+                return b;
         }
         return null;
     }
 
     private void checkLanding(Contact contact) {
         Fixture fa = contact.getFixtureA(), fb = contact.getFixtureB();
-        if (!isFixtureControlled(fa) && !isFixtureControlled(fb)) return;
+        if (!isFixtureControlled(fa) && !isFixtureControlled(fb))
+            return;
         Vector2 normal = contact.getWorldManifold().getNormal();
-        for (Player p : players) checkPlayerLanding(p, fa, fb, normal);
+        for (Player p : players)
+            checkPlayerLanding(p, fa, fb, normal);
     }
 
     private void checkPlayerLanding(Player player, Fixture fa, Fixture fb, Vector2 normal) {
         Block block = player.getCurrentBlock();
-        if (block == null) return;
+        if (block == null)
+            return;
         boolean isFa = (fa.getBody() == block.body);
         boolean isFb = (fb.getBody() == block.body);
-        if (!isFa && !isFb) return;
+        if (!isFa && !isFb)
+            return;
         float ny = isFa ? -normal.y : normal.y;
         if (ny > LANDING_NORMAL_THRESHOLD && !blocksToSettle.contains(block, true)) {
             blocksToSettle.add(block);
         }
     }
 
-    // ─── Main render loop ───────────────────────────────────────────
+    
     @Override
     public void render(float delta) {
-        if (gameOver || transitioning) return;
+        if (gameOver || transitioning)
+            return;
 
-        // ── Countdown phase ─────────────────────────────────────────
+        
         if (!countdownDone) {
             countdownTimer -= delta;
             if (countdownTimer <= 0) {
                 countdownDone = true;
-                // Spawn first blocks now that countdown is done
+                
                 for (Player p : players) {
                     spawnForPlayer(p);
                 }
@@ -321,9 +360,11 @@ public class PlayingScreen extends ScreenAdapter {
         if (countdownDone && !paused) {
             elapsedTime += delta;
 
-            for (int i = 0; i < players.length; i++) inputHandlers[i].handleInput(players[i]);
+            for (int i = 0; i < players.length; i++)
+                inputHandlers[i].handleInput(players[i]);
 
-            // Save controlled blocks' X positions before physics step to prevent horizontal drift/nudging by physics
+            
+            
             float[] savedControlledX = new float[players.length];
             boolean[] hasControlledBlock = new boolean[players.length];
             for (int i = 0; i < players.length; i++) {
@@ -336,7 +377,7 @@ public class PlayingScreen extends ScreenAdapter {
 
             world.step(1 / 60f, STEP_VEL_ITERATIONS, STEP_POS_ITERATIONS);
 
-            // Restore controlled blocks' X positions to maintain perfect grid alignment
+            
             for (int i = 0; i < players.length; i++) {
                 if (hasControlledBlock[i]) {
                     Block b = players[i].getCurrentBlock();
@@ -352,25 +393,30 @@ public class PlayingScreen extends ScreenAdapter {
             processSettleQueue();
             updateMaxHeights();
             checkOutOfBounds();
-            if (gameOver || transitioning) return;
+            if (gameOver || transitioning)
+                return;
 
             float[] mh = getMaxHeightsArray();
             if (strategy.checkWinCondition(players, elapsedTime, mh) ||
-                strategy.checkLoseCondition(players, elapsedTime)) {
+                    strategy.checkLoseCondition(players, elapsedTime)) {
                 triggerGameOver();
                 return;
             }
 
-            for (Player p : players) updatePlayer(p, delta);
+            for (Player p : players)
+                updatePlayer(p, delta);
 
-            // Update spell system
+            
             float[] spellMh = getMaxHeightsArray();
             spellManager.update(delta, players, spellMh, world, activeBlocks);
 
-            // Handle spell cast keys
+            
             for (int i = 0; i < players.length; i++) {
                 if (i < SPELL_CAST_KEYS.length && Gdx.input.isKeyJustPressed(SPELL_CAST_KEYS[i])) {
-                    spellManager.castSpell(i, players, world, activeBlocks);
+                    Spell casted = spellManager.castSpell(i, players, world, activeBlocks);
+                    if (casted != null && spellCastSound != null) {
+                        spellCastSound.play();
+                    }
                 }
             }
         }
@@ -378,7 +424,7 @@ public class PlayingScreen extends ScreenAdapter {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Camera follow: smooth-lerp upward to track the tallest tower
+        
         updateCameraFollow(delta);
         viewport.apply();
 
@@ -394,7 +440,8 @@ public class PlayingScreen extends ScreenAdapter {
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // Reset OpenGL viewport to the full window size so that HUD is drawn on the full screen
+        
+        
         Gdx.gl.glViewport(0, 0, screenWidth, screenHeight);
 
         if (countdownDone) {
@@ -408,7 +455,7 @@ public class PlayingScreen extends ScreenAdapter {
         }
         game.batch.end();
 
-        // ── Countdown overlay ───────────────────────────────────────
+        
         if (!countdownDone) {
             drawCountdownOverlay();
         }
@@ -416,26 +463,90 @@ public class PlayingScreen extends ScreenAdapter {
         if (paused) {
             drawPauseOverlay();
 
+            
+            float w = screenWidth, h = screenHeight;
+            float cx = w / 2f;
+            float mouseX = Gdx.input.getX();
+            float mouseY = h - Gdx.input.getY();
+
+            float cardW = 360, cardH = 90, gap = 20;
+            float totalH = 3 * cardH + 2 * gap;
+            float startY = h / 2f + totalH / 2f - 40;
+            float cardsStartY = startY - 45f;
+
+            for (int i = 0; i < 3; i++) {
+                float y = cardsStartY - i * (cardH + gap) - 15f;
+                float x = cx - cardW / 2;
+
+                if (mouseX >= x && mouseX <= x + cardW && mouseY >= y && mouseY <= y + cardH) {
+                    pauseSelectedIndex = i;
+                    if (Gdx.input.justTouched()) {
+                        if (pauseSelectedIndex == 0) {
+                            paused = false;
+                        } else if (pauseSelectedIndex == 1) {
+                            paused = false;
+                            gameOver = true;
+                            game.setScreen(new ModeSelectScreen(game, loggedInPlayerId));
+                            return;
+                        } else {
+                            paused = false;
+                            GameModeStrategy freshStrategy;
+                            if (strategy instanceof PuzzleStrategy) {
+                                freshStrategy = new PuzzleStrategy(playerCount);
+                            } else if (strategy instanceof RaceStrategy) {
+                                freshStrategy = new RaceStrategy();
+                            } else if (strategy instanceof TimeAttackStrategy) {
+                                freshStrategy = new TimeAttackStrategy();
+                            } else {
+                                freshStrategy = new com.alfa.chaotictower.strategy.SurvivalStrategy();
+                            }
+                            hide();
+                            PlayingScreen ps = new PlayingScreen(game, playerCount, freshStrategy);
+                            ps.setPlayerId(loggedInPlayerId);
+                            game.setScreen(ps);
+                            return;
+                        }
+                    }
+                }
+            }
+
             if (Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W)) {
                 pauseSelectedIndex = Math.max(0, pauseSelectedIndex - 1);
             }
             if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || Gdx.input.isKeyJustPressed(Input.Keys.S)) {
-                pauseSelectedIndex = Math.min(1, pauseSelectedIndex + 1);
+                pauseSelectedIndex = Math.min(2, pauseSelectedIndex + 1);
             }
             if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
                 if (pauseSelectedIndex == 0) {
                     paused = false;
-                } else {
+                } else if (pauseSelectedIndex == 1) {
                     paused = false;
                     gameOver = true;
                     game.setScreen(new ModeSelectScreen(game, loggedInPlayerId));
+                    return;
+                } else {
+                    paused = false;
+                    GameModeStrategy freshStrategy;
+                    if (strategy instanceof PuzzleStrategy) {
+                        freshStrategy = new PuzzleStrategy(playerCount);
+                    } else if (strategy instanceof RaceStrategy) {
+                        freshStrategy = new RaceStrategy();
+                    } else if (strategy instanceof TimeAttackStrategy) {
+                        freshStrategy = new TimeAttackStrategy();
+                    } else {
+                        freshStrategy = new com.alfa.chaotictower.strategy.SurvivalStrategy();
+                    }
+                    hide();
+                    PlayingScreen ps = new PlayingScreen(game, playerCount, freshStrategy);
+                    ps.setPlayerId(loggedInPlayerId);
+                    game.setScreen(ps);
                     return;
                 }
             }
         }
     }
 
-    // ─── Pause overlay ──────────────────────────────────────────────
+    
     private void drawPauseOverlay() {
         float w = screenWidth, h = screenHeight;
         float cx = w / 2f;
@@ -449,19 +560,23 @@ public class PlayingScreen extends ScreenAdapter {
         shapeRenderer.rect(0, 0, w, h);
 
         float cardW = 360, cardH = 90, gap = 20;
-        float totalH = 2 * cardH + gap;
+        float totalH = 3 * cardH + 2 * gap;
         float startY = h / 2f + totalH / 2f - 40;
+        
+        
+        float cardsStartY = startY - 45f;
 
-        for (int i = 0; i < 2; i++) {
-            float y = startY - i * (cardH + gap);
+        for (int i = 0; i < 3; i++) {
+            float y = cardsStartY - i * (cardH + gap);
             boolean sel = (i == pauseSelectedIndex);
-            
+
             shapeRenderer.setColor(sel ? CARD_SEL : CARD_BG);
-            shapeRenderer.rect(cx - cardW / 2, y, cardW, cardH);
             
+            shapeRenderer.rect(cx - cardW / 2, y - 15f, cardW, cardH);
+
             if (sel) {
                 shapeRenderer.setColor(ACCENT);
-                shapeRenderer.rect(cx - cardW / 2, y, 5, cardH);
+                shapeRenderer.rect(cx - cardW / 2, y - 15f, 5, cardH);
             }
         }
         shapeRenderer.end();
@@ -473,12 +588,14 @@ public class PlayingScreen extends ScreenAdapter {
         glyphLayout.setText(titleFont, "PAUSED");
         titleFont.draw(game.batch, "PAUSED", cx - glyphLayout.width / 2, startY + cardH + 80);
 
-        for (int i = 0; i < 2; i++) {
-            float y = startY - i * (cardH + gap);
+        for (int i = 0; i < 3; i++) {
+            float y = cardsStartY - i * (cardH + gap);
             boolean sel = (i == pauseSelectedIndex);
-            
-            if (sel) menuFont.setColor(Color.WHITE);
-            else menuFont.setColor(0.6f, 0.6f, 0.7f, 1);
+
+            if (sel)
+                menuFont.setColor(Color.WHITE);
+            else
+                menuFont.setColor(0.6f, 0.6f, 0.7f, 1);
             menuFont.draw(game.batch, PAUSE_OPTS[i], cx - 140, y + 45);
 
             smallFont.setColor(0.5f, 0.5f, 0.6f, 1);
@@ -494,7 +611,7 @@ public class PlayingScreen extends ScreenAdapter {
         game.batch.end();
     }
 
-    // ─── Background gradient ────────────────────────────────────────
+    
     private void drawBackground() {
         float vw = viewport.getWorldWidth();
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
@@ -502,25 +619,28 @@ public class PlayingScreen extends ScreenAdapter {
         shapeRenderer.end();
     }
 
-    // ─── Subtle grid ────────────────────────────────────────────────
+    
     private void drawGrid() {
         float vw = viewport.getWorldWidth();
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         shapeRenderer.setColor(GRID_COLOR);
-        for (float x = 0; x <= vw; x += 1f) shapeRenderer.line(x, 0, x, 30);
-        for (float y = 0; y <= 30; y += 1f) shapeRenderer.line(0, y, vw, y);
+        for (float x = 0; x <= vw; x += 1f)
+            shapeRenderer.line(x, 0, x, 30);
+        for (float y = 0; y <= 30; y += 1f)
+            shapeRenderer.line(0, y, vw, y);
         shapeRenderer.end();
     }
 
-    // ─── Pedestal, walls, divider ───────────────────────────────────
+    
     private void drawEnvironment() {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        // Pedestals with gradient (darker bottom, lighter top)
+        
         drawPedestal(10);
-        if (playerCount == 2) drawPedestal(30);
+        if (playerCount == 2)
+            drawPedestal(30);
 
-        // Walls
+        
         shapeRenderer.setColor(WALL_COLOR);
         if (playerCount == 1) {
             shapeRenderer.rect(2.5f - 0.15f, 0, 0.3f, 30);
@@ -532,7 +652,7 @@ public class PlayingScreen extends ScreenAdapter {
             shapeRenderer.rect(37.5f - 0.15f, 0, 0.3f, 30);
         }
 
-        // Divider (2P only)
+        
         if (playerCount == 2) {
             shapeRenderer.setColor(DIVIDER_C);
             shapeRenderer.rect(20f - 0.12f, 0, 0.24f, 30);
@@ -544,32 +664,34 @@ public class PlayingScreen extends ScreenAdapter {
     private void drawPedestal(float cx) {
         float x = cx - 2.5f, y = PEDESTAL_Y - PEDESTAL_HALF;
         float w = 5f, h = 2f;
-        // Bottom half darker, top half lighter
+        
         shapeRenderer.rect(x, y, w, h,
-            PEDESTAL_C, PEDESTAL_C, PEDESTAL_T, PEDESTAL_T);
-        // Top edge highlight
+                PEDESTAL_C, PEDESTAL_C, PEDESTAL_T, PEDESTAL_T);
+        
         tempColor.set(1, 1, 1, 0.12f);
         shapeRenderer.setColor(tempColor);
         shapeRenderer.rect(x, y + h - 0.08f, w, 0.08f);
     }
 
-    // ─── Block rendering ────────────────────────────────────────────
+    
     private void drawBlocks() {
-        // Pass 1: filled tiles
+        
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         for (int i = 0; i < activeBlocks.size; i++) {
             Block block = activeBlocks.get(i);
-            if (block.body == null) continue;
+            if (block.body == null)
+                continue;
             drawBlockFilled(block);
         }
         shapeRenderer.end();
 
-        // Pass 2: outlines
+        
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         shapeRenderer.setColor(OUTLINE_C);
         for (int i = 0; i < activeBlocks.size; i++) {
             Block block = activeBlocks.get(i);
-            if (block.body == null) continue;
+            if (block.body == null)
+                continue;
             drawBlockOutline(block);
         }
         shapeRenderer.end();
@@ -582,24 +704,23 @@ public class PlayingScreen extends ScreenAdapter {
         float cos = MathUtils.cos(angle), sin = MathUtils.sin(angle);
         float deg = angle * MathUtils.radiansToDegrees;
 
-        // Spell visual overrides
+        
         if (block.isCemented()) {
-            base = new Color(0.6f, 0.6f, 0.6f, 1f); // grey for cement
+            base = new Color(0.6f, 0.6f, 0.6f, 1f); 
         } else if (block.isIvied()) {
             base = new Color(
-                base.r * 0.5f, Math.min(1f, base.g * 0.8f + 0.4f), base.b * 0.3f, 1f
-            ); // green tint for ivy
+                    base.r * 0.5f, Math.min(1f, base.g * 0.8f + 0.4f), base.b * 0.3f, 1f); 
         } else if (block.isFrosted()) {
-            base = new Color(0.5f, 0.8f, 1f, 0.85f); // ice-blue semi-transparent for frosted
+            base = new Color(0.5f, 0.8f, 1f, 0.85f); 
         }
 
-        // Controlled block pulses slightly
+        
         if (block.isControlled()) {
             float pulse = 0.12f * (float) Math.sin(elapsedTime * 6.0);
             tempColor.set(
-                Math.min(1, base.r + pulse),
-                Math.min(1, base.g + pulse),
-                Math.min(1, base.b + pulse), 1);
+                    Math.min(1, base.r + pulse),
+                    Math.min(1, base.g + pulse),
+                    Math.min(1, base.b + pulse), 1);
             shapeRenderer.setColor(tempColor);
         } else {
             shapeRenderer.setColor(base);
@@ -613,13 +734,13 @@ public class PlayingScreen extends ScreenAdapter {
             float wx = pos.x + local.x * cos - local.y * sin;
             float wy = pos.y + local.x * sin + local.y * cos;
             shapeRenderer.rect(
-                wx - halfTile, wy - halfTile,
-                halfTile, halfTile,
-                tileSize, tileSize,
-                1, 1, deg);
+                    wx - halfTile, wy - halfTile,
+                    halfTile, halfTile,
+                    tileSize, tileSize,
+                    1, 1, deg);
         }
 
-        // Inner highlight (lighter strip at top of each tile)
+        
         tempColor.set(1, 1, 1, 0.15f);
         shapeRenderer.setColor(tempColor);
         float highlightH = tileSize * 0.18f;
@@ -627,10 +748,10 @@ public class PlayingScreen extends ScreenAdapter {
             float wx = pos.x + local.x * cos - local.y * sin;
             float wy = pos.y + local.x * sin + local.y * cos;
             shapeRenderer.rect(
-                wx - halfTile, wy + halfTile - highlightH,
-                halfTile, halfTile,
-                tileSize, highlightH,
-                1, 1, deg);
+                    wx - halfTile, wy + halfTile - highlightH,
+                    halfTile, halfTile,
+                    tileSize, highlightH,
+                    1, 1, deg);
         }
     }
 
@@ -648,20 +769,22 @@ public class PlayingScreen extends ScreenAdapter {
             float wx = pos.x + local.x * cos - local.y * sin;
             float wy = pos.y + local.x * sin + local.y * cos;
             shapeRenderer.rect(
-                wx - halfTile, wy - halfTile,
-                halfTile, halfTile,
-                tileSize, tileSize,
-                1, 1, deg);
+                    wx - halfTile, wy - halfTile,
+                    halfTile, halfTile,
+                    tileSize, tileSize,
+                    1, 1, deg);
         }
     }
 
-    // ─── Target line ────────────────────────────────────────────────
+    
     private void drawTargetLine() {
         float th = -1;
-        if (strategy instanceof RaceStrategy) th = ((RaceStrategy) strategy).getTargetHeight();
-        else if (strategy instanceof TimeAttackStrategy) th = ((TimeAttackStrategy) strategy).getTargetHeight();
+        if (strategy instanceof RaceStrategy)
+            th = ((RaceStrategy) strategy).getTargetHeight();
+        else if (strategy instanceof TimeAttackStrategy)
+            th = ((TimeAttackStrategy) strategy).getTargetHeight();
 
-        // Puzzle mode: draw laser line per player (adjusted for penalties)
+        
         if (strategy instanceof PuzzleStrategy) {
             PuzzleStrategy puzzle = (PuzzleStrategy) strategy;
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
@@ -671,7 +794,7 @@ public class PlayingScreen extends ScreenAdapter {
                 float laserH = puzzle.getEffectiveLaserHeight(i);
                 float worldY = PEDESTAL_Y + PEDESTAL_HALF + laserH;
 
-                // Laser line — red/orange
+                
                 tempColor.set(1f, 0.3f, 0.1f, dashAlpha);
                 shapeRenderer.setColor(tempColor);
                 if (playerCount == 1) {
@@ -685,32 +808,57 @@ public class PlayingScreen extends ScreenAdapter {
             return;
         }
 
-        if (th <= 0) return;
+        if (th <= 0)
+            return;
 
         float worldY = PEDESTAL_Y + PEDESTAL_HALF + th;
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        // Dashed line effect
-        float dashAlpha = 0.45f + 0.15f * (float) Math.sin(elapsedTime * 3.0);
-        tempColor.set(1f, 0.85f, 0.1f, dashAlpha);
-        shapeRenderer.setColor(tempColor);
-        if (playerCount == 1) {
-            shapeRenderer.rect(2.5f, worldY - 0.04f, 15f, 0.08f);
+        if (strategy instanceof RaceStrategy) {
+            float squareSize = 0.5f;
+            float totalH = 2 * squareSize;
+            float startY = worldY - totalH / 2f;
+
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+            for (int pIdx = 0; pIdx < playerCount; pIdx++) {
+                float startX = (pIdx == 0) ? 2.5f : 22.5f;
+                for (int col = 0; col < 30; col++) {
+                    float x = startX + col * squareSize;
+                    for (int row = 0; row < 2; row++) {
+                        float y = startY + row * squareSize;
+                        if ((col + row) % 2 == 0) {
+                            shapeRenderer.setColor(1f, 1f, 1f, 0.5f); 
+                        } else {
+                            shapeRenderer.setColor(0f, 0f, 0f, 0.5f); 
+                        }
+                        shapeRenderer.rect(x, y, squareSize, squareSize);
+                    }
+                }
+            }
+            shapeRenderer.end();
         } else {
-            shapeRenderer.rect(2.5f, worldY - 0.04f, 15f, 0.08f);
-            shapeRenderer.rect(22.5f, worldY - 0.04f, 15f, 0.08f);
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+            
+            float dashAlpha = 0.45f + 0.15f * (float) Math.sin(elapsedTime * 3.0);
+            tempColor.set(1f, 0.85f, 0.1f, dashAlpha);
+            shapeRenderer.setColor(tempColor);
+            if (playerCount == 1) {
+                shapeRenderer.rect(2.5f, worldY - 0.04f, 15f, 0.08f);
+            } else {
+                shapeRenderer.rect(2.5f, worldY - 0.04f, 15f, 0.08f);
+                shapeRenderer.rect(22.5f, worldY - 0.04f, 15f, 0.08f);
+            }
+            shapeRenderer.end();
         }
-        shapeRenderer.end();
     }
 
-    // ─── HUD ────────────────────────────────────────────────────────
+    
     private void drawHudBackgrounds() {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         shapeRenderer.setProjectionMatrix(hudCamera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        float cardW = 350;
-        float cardH = 175;
+        float cardW = (playerCount == 2) ? 170f : 350f;
+        float cardH = (playerCount == 2) ? 250f : 175f;
         float playLeft = (screenWidth - viewport.getScreenWidth()) / 2f;
 
         if (playerCount == 1) {
@@ -719,8 +867,8 @@ public class PlayingScreen extends ScreenAdapter {
         } else {
             float p1X = 20f;
             float p2X = screenWidth - cardW - 20f;
-            drawCardBackground(p1X, screenHeight - 195, cardW, cardH, players[0]);
-            drawCardBackground(p2X, screenHeight - 195, cardW, cardH, players[1]);
+            drawCardBackground(p1X, screenHeight - 270, cardW, cardH, players[0]);
+            drawCardBackground(p2X, screenHeight - 270, cardW, cardH, players[1]);
         }
 
         shapeRenderer.end();
@@ -728,19 +876,27 @@ public class PlayingScreen extends ScreenAdapter {
     }
 
     private void drawCardBackground(float x, float y, float w, float h, Player p) {
-        // Outer glowing border
+        
         shapeRenderer.setColor(0.45f, 0.35f, 0.85f, 0.5f);
         shapeRenderer.rect(x - 2, y - 2, w + 4, h + 4);
 
-        // Inner card background
+        
         shapeRenderer.setColor(0.10f, 0.10f, 0.20f, 0.85f);
         shapeRenderer.rect(x, y, w, h);
 
-        // Next block slot chamber (dark box)
-        float slotX = x + 245;
-        float slotY = y + 15;
-        float slotW = 90;
-        float slotH = 115;
+        
+        float slotX, slotY, slotW, slotH;
+        if (playerCount == 2) {
+            slotW = 90;
+            slotH = 80;
+            slotX = x + (w - slotW) / 2f;
+            slotY = y + 15;
+        } else {
+            slotX = x + 245;
+            slotY = y + 15;
+            slotW = 90;
+            slotH = 115;
+        }
 
         shapeRenderer.setColor(0.45f, 0.35f, 0.85f, 0.3f);
         shapeRenderer.rect(slotX - 1, slotY - 1, slotW + 2, slotH + 2);
@@ -748,24 +904,29 @@ public class PlayingScreen extends ScreenAdapter {
         shapeRenderer.setColor(0.06f, 0.06f, 0.12f, 0.9f);
         shapeRenderer.rect(slotX, slotY, slotW, slotH);
 
-        // Render preview block tiles
+        
         BlockFactory factory = BlockFactory.getInstance();
-        int nextType = factory.peekNextType(p.getId());
+        boolean isPuzzle = (strategy instanceof PuzzleStrategy);
+        int nextType = factory.peekNextType(p.getId(), isPuzzle, p.getBlocksSpawnedCount());
         Vector2[] offsets = factory.getShapeOffsets(nextType);
         Color color = BLOCK_COLORS[nextType];
 
-        float tilePixel = 20f;
+        float tilePixel = (playerCount == 2) ? 16f : 20f;
         float centerX = slotX + slotW / 2f;
         float centerY = slotY + slotH / 2f;
 
-        // Compute bounding box of offsets to center the shape perfectly
+        
         float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
         float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
         for (Vector2 off : offsets) {
-            if (off.x < minX) minX = off.x;
-            if (off.x > maxX) maxX = off.x;
-            if (off.y < minY) minY = off.y;
-            if (off.y > maxY) maxY = off.y;
+            if (off.x < minX)
+                minX = off.x;
+            if (off.x > maxX)
+                maxX = off.x;
+            if (off.y < minY)
+                minY = off.y;
+            if (off.y > maxY)
+                maxY = off.y;
         }
         float shapeCenterX = (minX + maxX) / 2f;
         float shapeCenterY = (minY + maxY) / 2f;
@@ -777,7 +938,7 @@ public class PlayingScreen extends ScreenAdapter {
             shapeRenderer.rect(tx - tilePixel / 2f + 1, ty - tilePixel / 2f + 1, tilePixel - 2, tilePixel - 2);
         }
 
-        // Outlines
+        
         shapeRenderer.end();
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         shapeRenderer.setColor(0, 0, 0, 0.5f);
@@ -793,13 +954,13 @@ public class PlayingScreen extends ScreenAdapter {
     private void drawHudText() {
         float cx = screenWidth / 2f;
 
-        // Mode name centered
+        
         menuFont.getData().setScale(0.8f);
         glyphLayout.setText(menuFont, strategy.getModeName());
         menuFont.draw(game.batch, strategy.getModeName(), cx - glyphLayout.width / 2f, screenHeight - 25);
         menuFont.getData().setScale(1.0f);
 
-        // Timer centered
+        
         hudBuilder.setLength(0);
         if (strategy instanceof TimeAttackStrategy) {
             double remaining = Math.max(0, ((TimeAttackStrategy) strategy).getTimeLimit() - elapsedTime);
@@ -812,104 +973,187 @@ public class PlayingScreen extends ScreenAdapter {
         smallFont.draw(game.batch, hudBuilder, cx - glyphLayout.width / 2f, screenHeight - 60);
         smallFont.getData().setScale(1.0f);
 
-        float cardW = 350;
+        float cardW = (playerCount == 2) ? 170f : 350f;
         float playLeft = (screenWidth - viewport.getScreenWidth()) / 2f;
 
-        // Draw Player Panels
+        
         if (playerCount == 1) {
             float p1X = Math.max(20f, (playLeft - cardW) / 2f);
             drawPlayerHudText(players[0], p1X, screenHeight - 195);
         } else {
             float p1X = 20f;
             float p2X = screenWidth - cardW - 20f;
-            drawPlayerHudText(players[0], p1X, screenHeight - 195);
-            drawPlayerHudText(players[1], p2X, screenHeight - 195);
+            drawPlayerHudText(players[0], p1X, screenHeight - 270);
+            drawPlayerHudText(players[1], p2X, screenHeight - 270);
         }
     }
 
     private void drawPlayerHudText(Player p, float cardX, float cardY) {
-        float sx = cardX + 15;
+        float sx = (playerCount == 2) ? cardX + 10 : cardX + 15;
 
-        // Lives
-        hudBuilder.setLength(0);
-        hudBuilder.append("P").append(p.getId()).append("  ");
-        for (int i = 0; i < p.getLives(); i++) hudBuilder.append("\u2665 ");
-        hudFont.getData().setScale(0.85f);
-        hudFont.draw(game.batch, hudBuilder, sx, cardY + 145);
-        hudFont.getData().setScale(1.0f);
-
-        // Score
-        hudBuilder.setLength(0);
-        hudBuilder.append("Score: ").append(p.getScore());
-        smallFont.getData().setScale(0.85f);
-        smallFont.draw(game.batch, hudBuilder, sx, cardY + 115);
-
-        // Height
-        hudBuilder.setLength(0);
-        hudBuilder.append("Height: ").append(String.format("%.1f", p.getMaxHeight())).append("m");
-        smallFont.draw(game.batch, hudBuilder, sx, cardY + 88);
-
-        // Spell & Cooldown (Only in 2 Players mode)
         if (playerCount == 2) {
+            float baseScale = 0.55f;
+            float hudScale = 0.60f;
+
+            
+            hudBuilder.setLength(0);
+            hudBuilder.append("P").append(p.getId());
+            hudFont.getData().setScale(hudScale);
+            hudFont.draw(game.batch, hudBuilder, sx, cardY + 226);
+            hudFont.getData().setScale(1.0f);
+
+            
+            hudBuilder.setLength(0);
+            hudBuilder.append("Score: ").append(p.getScore());
+            smallFont.getData().setScale(baseScale);
+            smallFont.draw(game.batch, hudBuilder, sx, cardY + 204);
+
+            
+            hudBuilder.setLength(0);
+            hudBuilder.append("Height: ").append(String.format("%.1f", p.getMaxHeight())).append("m");
+            smallFont.draw(game.batch, hudBuilder, sx, cardY + 182);
+
+            
+            hudBuilder.setLength(0);
+            hudBuilder.append("Lives: ").append(p.getLives());
+            smallFont.draw(game.batch, hudBuilder, sx, cardY + 160);
+
+            
             int playerIndex = p.getId() - 1;
             float cooldown = spellManager.getSpellCooldown(playerIndex);
             if (cooldown > 0) {
                 hudBuilder.setLength(0);
                 hudBuilder.append("COOLDOWN: ").append(String.format("%.1f", cooldown)).append("s");
                 smallFont.setColor(0.7f, 0.7f, 0.7f, 0.8f);
-                smallFont.draw(game.batch, hudBuilder, sx, cardY + 61);
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 138);
                 smallFont.setColor(Color.WHITE);
             } else {
                 Spell available = spellManager.getAvailableSpell(playerIndex);
                 if (available != null) {
                     hudBuilder.setLength(0);
-                    String keyName = (playerIndex == 0) ? "[F]" : "[Num0]";
-                    smallFont.setColor(0.3f, 0.9f, 1.0f, 1f); // Glowing cyan for mystery magic
-                    hudBuilder.append(keyName).append(" MAGIC READY");
-                    smallFont.draw(game.batch, hudBuilder, sx, cardY + 61);
+                    smallFont.setColor(0.3f, 0.9f, 1.0f, 1f); 
+                    hudBuilder.append("MAGIC READY");
+                    smallFont.draw(game.batch, hudBuilder, sx, cardY + 138);
                     smallFont.setColor(Color.WHITE);
                 } else {
                     hudBuilder.setLength(0);
                     hudBuilder.append("NO SPELL");
                     smallFont.setColor(0.5f, 0.5f, 0.5f, 0.6f);
-                    smallFont.draw(game.batch, hudBuilder, sx, cardY + 61);
+                    smallFont.draw(game.batch, hudBuilder, sx, cardY + 138);
                     smallFont.setColor(Color.WHITE);
                 }
             }
-        }
 
-        // Active Effects
-        hudBuilder.setLength(0);
-        if (p.isFrosted()) hudBuilder.append("ICE ");
-        if (p.isSpedUp()) hudBuilder.append("FAST ");
-        if (p.isWeighted()) hudBuilder.append("HEAVY ");
-        if (hudBuilder.length() > 0) {
-            smallFont.setColor(0.6f, 0.8f, 1f, 1f);
-            smallFont.draw(game.batch, hudBuilder, sx, cardY + 34);
-            smallFont.setColor(Color.WHITE);
-        }
+            
+            hudBuilder.setLength(0);
+            if (p.isFrosted())
+                hudBuilder.append("ICE ");
+            if (p.isSpedUp())
+                hudBuilder.append("FAST ");
+            if (p.isWeighted())
+                hudBuilder.append("HEAVY ");
+            if (hudBuilder.length() > 0) {
+                smallFont.setColor(0.6f, 0.8f, 1f, 1f);
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 118);
+                smallFont.setColor(Color.WHITE);
+            }
 
-        // NEXT block label centered over slot
-        float slotX = cardX + 245;
-        smallFont.getData().setScale(0.8f);
-        glyphLayout.setText(smallFont, "NEXT");
-        smallFont.draw(game.batch, "NEXT", slotX + 45f - glyphLayout.width / 2f, cardY + 148);
-        smallFont.getData().setScale(1.0f);
+            
+            float slotX = cardX + 40f;
+            smallFont.getData().setScale(baseScale * 0.94f);
+            glyphLayout.setText(smallFont, "NEXT");
+            smallFont.draw(game.batch, "NEXT", slotX + 45f - glyphLayout.width / 2f, cardY + 102);
+            smallFont.getData().setScale(1.0f);
+
+        } else {
+            float baseScale = 0.55f;
+            float hudScale = 0.60f;
+
+            if (strategy instanceof RaceStrategy) {
+                
+                hudBuilder.setLength(0);
+                hudBuilder.append("P").append(p.getId());
+                hudFont.getData().setScale(hudScale);
+                hudFont.draw(game.batch, hudBuilder, sx, cardY + 145);
+                hudFont.getData().setScale(1.0f);
+
+                
+                hudBuilder.setLength(0);
+                hudBuilder.append("Height: ").append(String.format("%.1f", p.getMaxHeight())).append("m");
+                smallFont.getData().setScale(baseScale);
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 115);
+
+                
+                hudBuilder.setLength(0);
+                float target = ((RaceStrategy) strategy).getTargetHeight();
+                float dist = Math.max(0f, target - p.getMaxHeight());
+                hudBuilder.append("To Go: ").append(String.format("%.1f", dist)).append("m");
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 88);
+            } else {
+                
+                hudBuilder.setLength(0);
+                hudBuilder.append("P").append(p.getId());
+                hudFont.getData().setScale(hudScale);
+                hudFont.draw(game.batch, hudBuilder, sx, cardY + 145);
+                hudFont.getData().setScale(1.0f);
+
+                
+                hudBuilder.setLength(0);
+                hudBuilder.append("Score: ").append(p.getScore());
+                smallFont.getData().setScale(baseScale);
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 118);
+
+                
+                hudBuilder.setLength(0);
+                hudBuilder.append("Height: ").append(String.format("%.1f", p.getMaxHeight())).append("m");
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 91);
+
+                
+                hudBuilder.setLength(0);
+                hudBuilder.append("Lives: ").append(p.getLives());
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 64);
+            }
+
+            
+            hudBuilder.setLength(0);
+            if (p.isFrosted())
+                hudBuilder.append("ICE ");
+            if (p.isSpedUp())
+                hudBuilder.append("FAST ");
+            if (p.isWeighted())
+                hudBuilder.append("HEAVY ");
+            if (hudBuilder.length() > 0) {
+                smallFont.setColor(0.6f, 0.8f, 1f, 1f);
+                smallFont.draw(game.batch, hudBuilder, sx, cardY + 37);
+                smallFont.setColor(Color.WHITE);
+            }
+
+            
+            float slotX = cardX + 245;
+            smallFont.getData().setScale(baseScale * 0.94f);
+            glyphLayout.setText(smallFont, "NEXT");
+            smallFont.draw(game.batch, "NEXT", slotX + 45f - glyphLayout.width / 2f, cardY + 148);
+            smallFont.getData().setScale(1.0f);
+        }
     }
 
-    // ─── Countdown Overlay ──────────────────────────────────────────
+    
     private void drawCountdownOverlay() {
         float cx = screenWidth / 2f;
         float cy = screenHeight / 2f;
 
         String text;
         int sec = (int) Math.ceil(countdownTimer);
-        if (sec >= 3) text = "3";
-        else if (sec == 2) text = "2";
-        else if (sec == 1) text = "1";
-        else text = "GO!";
+        if (sec >= 3)
+            text = "3";
+        else if (sec == 2)
+            text = "2";
+        else if (sec == 1)
+            text = "1";
+        else
+            text = "GO!";
 
-        // Slight scale pulse
+        
         float pulse = 1.0f + 0.15f * (float) Math.sin(countdownTimer * 12.0);
 
         game.batch.setProjectionMatrix(hudCamera.combined);
@@ -921,9 +1165,10 @@ public class PlayingScreen extends ScreenAdapter {
         game.batch.end();
     }
 
-    // ─── Settle queue ───────────────────────────────────────────────
+    
     private void processSettleQueue() {
-        if (blocksToSettle.size == 0) return;
+        if (blocksToSettle.size == 0)
+            return;
         for (int i = 0; i < blocksToSettle.size; i++) {
             Block block = blocksToSettle.get(i);
             block.setControlled(false);
@@ -931,7 +1176,7 @@ public class PlayingScreen extends ScreenAdapter {
                 if (p.getCurrentBlock() == block) {
                     p.addScore(10);
                     p.clearCurrentBlock();
-                    // Puzzle mode: track blocks placed
+                    
                     if (strategy instanceof PuzzleStrategy) {
                         ((PuzzleStrategy) strategy).onBlockPlaced(p.getId() - 1);
                     }
@@ -940,7 +1185,7 @@ public class PlayingScreen extends ScreenAdapter {
         }
         blocksToSettle.clear();
 
-        // Puzzle mode: check if any tower exceeds the laser line
+        
         if (strategy instanceof PuzzleStrategy) {
             PuzzleStrategy puzzle = (PuzzleStrategy) strategy;
             for (int pi = 0; pi < players.length; pi++) {
@@ -958,7 +1203,8 @@ public class PlayingScreen extends ScreenAdapter {
             if (!block.isControlled() && block.body != null) {
                 float rel = block.body.getPosition().y - (PEDESTAL_Y + PEDESTAL_HALF);
                 for (Player p : players) {
-                    if (block.ownerId == p.getId()) p.updateMaxHeight(rel);
+                    if (block.ownerId == p.getId())
+                        p.updateMaxHeight(rel);
                 }
             }
         }
@@ -966,23 +1212,23 @@ public class PlayingScreen extends ScreenAdapter {
 
     private float[] getMaxHeightsArray() {
         float[] arr = new float[players.length];
-        for (int i = 0; i < players.length; i++) arr[i] = players[i].getMaxHeight();
+        for (int i = 0; i < players.length; i++)
+            arr[i] = players[i].getMaxHeight();
         return arr;
     }
 
-    /**
-     * Smoothly lerps the camera upward to follow the tallest tower.
-     * The camera center Y is set so the pedestal stays visible at the bottom.
-     */
+    
     private void updateCameraFollow(float delta) {
         float maxTowerWorldY = PEDESTAL_Y + PEDESTAL_HALF;
         for (Player p : players) {
             float towerTop = PEDESTAL_Y + PEDESTAL_HALF + p.getMaxHeight();
-            if (towerTop > maxTowerWorldY) maxTowerWorldY = towerTop;
+            if (towerTop > maxTowerWorldY)
+                maxTowerWorldY = towerTop;
         }
 
-        // Target camera Y: keep the tower top in the upper portion of the viewport
-        // viewport height is 30, so camera center Y = towerTop - 10 (tower top at ~66% screen)
+        
+        
+        
         float targetY = Math.max(MIN_CAMERA_Y, maxTowerWorldY - 10f);
         camera.position.y = MathUtils.lerp(camera.position.y, targetY, CAMERA_LERP_SPEED * delta);
         camera.update();
@@ -990,69 +1236,104 @@ public class PlayingScreen extends ScreenAdapter {
 
     private void updatePlayer(Player p, float delta) {
         p.update(delta);
-        if (p.canSpawn()) spawnForPlayer(p);
+        if (p.canSpawn())
+            spawnForPlayer(p);
     }
 
-    // ─── Out-of-bounds ──────────────────────────────────────────────
+    
     private void checkOutOfBounds() {
         for (int i = activeBlocks.size - 1; i >= 0; i--) {
             Block block = activeBlocks.get(i);
             if (block.body.getPosition().y < -2f) {
                 for (Player p : players) {
                     if (block.ownerId == p.getId()) {
-                        // Puzzle mode: floor penalty instead of losing a life
+                        
                         if (strategy instanceof PuzzleStrategy) {
                             ((PuzzleStrategy) strategy).onBlockLost(p.getId() - 1);
+                        } else if (strategy instanceof RaceStrategy) {
+                            
                         } else {
                             p.loseLife();
                         }
                     }
-                    if (block == p.getCurrentBlock()) p.clearCurrentBlock();
+                    if (block == p.getCurrentBlock())
+                        p.clearCurrentBlock();
                 }
                 destroyAndFreeBlock(block);
                 activeBlocks.removeIndex(i);
-                if (strategy.checkLoseCondition(players, elapsedTime)) { triggerGameOver(); return; }
+                if (strategy.checkLoseCondition(players, elapsedTime)) {
+                    triggerGameOver();
+                    return;
+                }
             }
         }
     }
 
-    // ─── Game over ──────────────────────────────────────────────────
+    
     private void triggerGameOver() {
-        if (gameOver) return;
+        if (gameOver)
+            return;
         gameOver = true;
         float[] mh = getMaxHeightsArray();
         String result = strategy.getResultText(players, elapsedTime, mh);
-        int bestScore = 0; float bestH = 0;
+        int bestScore = 0;
+        float bestH = 0;
         for (Player p : players) {
-            if (p.getScore() > bestScore) bestScore = p.getScore();
-            if (p.getMaxHeight() > bestH) bestH = p.getMaxHeight();
+            if (p.getScore() > bestScore)
+                bestScore = p.getScore();
+            if (p.getMaxHeight() > bestH)
+                bestH = p.getMaxHeight();
+        }
+        if (strategy instanceof RaceStrategy) {
+            bestScore = (int) (elapsedTime * 1000);
         }
         game.setScreen(new GameOverScreen(game, loggedInPlayerId,
-            bestScore, elapsedTime, bestH, strategy.getBackendModeKey(), result));
+                bestScore, elapsedTime, bestH, strategy.getBackendModeKey(), result));
     }
 
     private void destroyAndFreeBlock(Block block) {
-        if (block.body != null && world != null) { world.destroyBody(block.body); block.body = null; }
+        if (block.body != null && world != null) {
+            world.destroyBody(block.body);
+            block.body = null;
+        }
         BlockFactory.getInstance().freeBlock(block);
     }
 
     @Override
     public void resize(int w, int h) {
         viewport.update(w, h, true);
-        screenWidth = w; screenHeight = h;
-        hudCamera.setToOrtho(false, w, h); hudCamera.update();
+        screenWidth = w;
+        screenHeight = h;
+        hudCamera.setToOrtho(false, w, h);
+        hudCamera.update();
     }
 
     @Override
     public void hide() {
         transitioning = true;
         blocksToSettle.clear();
-        for (int i = 0; i < activeBlocks.size; i++) destroyAndFreeBlock(activeBlocks.get(i));
+        for (int i = 0; i < activeBlocks.size; i++)
+            destroyAndFreeBlock(activeBlocks.get(i));
         activeBlocks.clear();
-        if (world != null) { world.dispose(); world = null; }
-        if (shapeRenderer != null) { shapeRenderer.dispose(); shapeRenderer = null; }
+        if (world != null) {
+            world.dispose();
+            world = null;
+        }
+        if (shapeRenderer != null) {
+            shapeRenderer.dispose();
+            shapeRenderer = null;
+        }
+        if (spellCastSound != null) {
+            spellCastSound.dispose();
+            spellCastSound = null;
+        }
     }
 
-    public void setPlayerId(Long id) { this.loggedInPlayerId = id; }
-    public Long getPlayerId() { return loggedInPlayerId; }
+    public void setPlayerId(Long id) {
+        this.loggedInPlayerId = id;
+    }
+
+    public Long getPlayerId() {
+        return loggedInPlayerId;
+    }
 }

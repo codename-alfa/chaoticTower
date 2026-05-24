@@ -4,11 +4,7 @@ import com.alfa.chaotictower.entity.Block;
 import com.alfa.chaotictower.magic.Spell;
 import com.alfa.chaotictower.magic.SpellContext;
 
-/**
- * Light Magic: Cement
- * Turns the most recently settled block into an immovable static body.
- * The block becomes permanently anchored — it won't be knocked off.
- */
+
 public class CementSpell extends Spell {
 
     public CementSpell() {

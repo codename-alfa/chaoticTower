@@ -20,7 +20,7 @@ public class PlayerService {
         Optional<Player> existingPlayer = playerRepository.findByUsername(username);
         if (existingPlayer.isPresent()) {
             Player player = existingPlayer.get();
-            // Handle transitioning players who don't have a password set yet
+            
             if (player.getPassword() == null || player.getPassword().isEmpty()) {
                 player.setPassword(password);
                 return playerRepository.save(player);

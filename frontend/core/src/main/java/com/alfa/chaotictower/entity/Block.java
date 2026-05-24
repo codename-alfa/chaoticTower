@@ -25,7 +25,7 @@ public class Block implements Pool.Poolable {
     public int ownerId;
     private boolean isControlled;
     private int tetrominoType;
-    /** Tile center positions in local body space (offset * TILE_SIZE). */
+    
     private Vector2[] localTilePositions;
 
     private final FixtureDef cachedFixtureDef;
@@ -45,17 +45,17 @@ public class Block implements Pool.Poolable {
         this.tetrominoType = tetrominoType;
         this.scale = scale;
 
-        // Store scaled tile positions for rendering
+        
         localTilePositions = new Vector2[tileOffsets.length];
         for (int i = 0; i < tileOffsets.length; i++) {
             localTilePositions[i] = new Vector2(tileOffsets[i]).scl(TILE_SIZE * scale);
         }
 
         BodyDef bodyDef = new BodyDef();
-        // WAJIB DynamicBody — bukan KinematicBody.
+        
         bodyDef.type = BodyDef.BodyType.DynamicBody;
         
-        // Align spawn X to correct grid line/cell based on width parity to eliminate landing snap
+        
         float grid = TILE_SIZE * scale;
         float adjustedX = x;
         if (tileOffsets != null && tileOffsets.length > 0) {
@@ -114,7 +114,7 @@ public class Block implements Pool.Poolable {
             body.setLinearDamping(0f);
             body.setAngularDamping(0f);
         } else {
-            // Snap X to nearest grid cell using the helper so landing snap distance is exactly 0.0f
+            
             float snappedX = getSnappedX();
             body.setTransform(snappedX, body.getPosition().y, body.getAngle());
 
@@ -139,7 +139,7 @@ public class Block implements Pool.Poolable {
         return localTilePositions;
     }
 
-    // ─── Spell visual flags ────────────────────────────────────────
+    
     private boolean cemented = false;
     private boolean ivied    = false;
 

@@ -8,6 +8,7 @@ import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -17,9 +18,10 @@ public class MainMenuScreen extends ScreenAdapter {
 
     private final Main game;
     private ShapeRenderer shapes;
+    private Texture leaderboardIcon;
     private String typedName = "";
     private String typedPassword = "";
-    private int activeFieldIndex = 0; // 0 = Username, 1 = Password, 2 = Mode Selector
+    private int activeFieldIndex = 0; 
     private boolean isRegisterMode = false;
     private boolean isConnecting = false;
     private String errorMessage = "";
@@ -38,6 +40,7 @@ public class MainMenuScreen extends ScreenAdapter {
     @Override
     public void show() {
         shapes = new ShapeRenderer();
+        leaderboardIcon = new Texture(Gdx.files.internal("leaderboard.png"));
         GameAssetManager assets = GameAssetManager.getInstance();
         titleFont = assets.getFont(GameAssetManager.FONT_TITLE);
         menuFont  = assets.getFont(GameAssetManager.FONT_MENU);
@@ -46,13 +49,26 @@ public class MainMenuScreen extends ScreenAdapter {
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-                if (isConnecting) return false;
-                
                 float w = Gdx.graphics.getWidth();
                 float h = Gdx.graphics.getHeight();
-                float cx = w / 2f;
+
                 
-                // Keep uBox/pBox/btn coordinates completely aligned with render()
+                float clickX = screenX;
+                float clickY = h - screenY;
+
+                
+                float btnLeaderX = w - 72 - 30;
+                float btnLeaderY = h - 64 - 30;
+                if (clickX >= btnLeaderX && clickX <= btnLeaderX + 72 && clickY >= btnLeaderY && clickY <= btnLeaderY + 64) {
+                    game.setScreen(new LeaderboardScreen(game));
+                    return true;
+                }
+
+                if (isConnecting) return false;
+
+                float cx = w / 2f;
+
+                
                 float boxW = 520, boxH = 50;
                 float uBoxX = cx - boxW / 2, uBoxY = h / 2f + 10;
                 float pBoxX = cx - boxW / 2, pBoxY = h / 2f - 60;
@@ -60,10 +76,6 @@ public class MainMenuScreen extends ScreenAdapter {
                 float btnW = 240, btnH = 45;
                 float lBtnX = cx - btnW - 20, lBtnY = h / 2f - 135;
                 float rBtnX = cx + 20, rBtnY = h / 2f - 135;
-
-                // Convert screen coordinates
-                float clickX = screenX;
-                float clickY = h - screenY;
 
                 if (clickX >= uBoxX && clickX <= uBoxX + boxW && clickY >= uBoxY && clickY <= uBoxY + boxH) {
                     activeFieldIndex = 0;
@@ -134,7 +146,7 @@ public class MainMenuScreen extends ScreenAdapter {
                         }
                     }
                 } else if (c == '\t') {
-                    // Handled in keyDown
+                    
                 } else if (c >= 32 && c <= 126) {
                     if (activeFieldIndex == 0) {
                         if (typedName.length() < 20) typedName += c;
@@ -189,12 +201,12 @@ public class MainMenuScreen extends ScreenAdapter {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-        // Apply temporary dynamic scales to fonts for clean multi-resolution fit
+        
         titleFont.getData().setScale(0.8f);
         menuFont.getData().setScale(0.65f);
         smallFont.getData().setScale(0.7f);
 
-        // UI layout and coordinates optimized for 1280x720 window
+        
         float boxW = 520, boxH = 50;
         float uBoxX = cx - boxW / 2, uBoxY = h / 2f + 10;
         float pBoxX = cx - boxW / 2, pBoxY = h / 2f - 60;
@@ -204,68 +216,68 @@ public class MainMenuScreen extends ScreenAdapter {
         float rBtnX = cx + 20, rBtnY = h / 2f - 135;
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(BG_BOT.r, BG_BOT.g, BG_BOT.b, 1.0f); // background solid
+        shapes.setColor(BG_BOT.r, BG_BOT.g, BG_BOT.b, 1.0f); 
         shapes.rect(0, 0, w, h, BG_BOT, BG_BOT, BG_TOP, BG_TOP);
 
-        // Decorative floating blocks
+        
         drawDecoBlocks(w, h);
 
-        // Username Box: Filled background
+        
         shapes.setColor(0.16f, 0.16f, 0.28f, 0.9f);
         shapes.rect(uBoxX, uBoxY, boxW, boxH);
-        // Username Box: Glowing cyan active focus or soft inactive purple border
+        
         if (activeFieldIndex == 0) {
             shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f);
         } else {
             shapes.setColor(0.25f, 0.20f, 0.45f, 0.5f);
         }
-        shapes.rect(uBoxX, uBoxY, boxW, 2); // bottom
-        shapes.rect(uBoxX, uBoxY + boxH - 2, boxW, 2); // top
-        shapes.rect(uBoxX, uBoxY, 2, boxH); // left
-        shapes.rect(uBoxX + boxW - 2, uBoxY, 2, boxH); // right
+        shapes.rect(uBoxX, uBoxY, boxW, 2); 
+        shapes.rect(uBoxX, uBoxY + boxH - 2, boxW, 2); 
+        shapes.rect(uBoxX, uBoxY, 2, boxH); 
+        shapes.rect(uBoxX + boxW - 2, uBoxY, 2, boxH); 
 
-        // Password Box: Filled background
+        
         shapes.setColor(0.16f, 0.16f, 0.28f, 0.9f);
         shapes.rect(pBoxX, pBoxY, boxW, boxH);
-        // Password Box: Glowing cyan active focus or soft inactive purple border
+        
         if (activeFieldIndex == 1) {
             shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f);
         } else {
             shapes.setColor(0.25f, 0.20f, 0.45f, 0.5f);
         }
-        shapes.rect(pBoxX, pBoxY, boxW, 2); // bottom
-        shapes.rect(pBoxX, pBoxY + boxH - 2, boxW, 2); // top
-        shapes.rect(pBoxX, pBoxY, 2, boxH); // left
-        shapes.rect(pBoxX + boxW - 2, pBoxY, 2, boxH); // right
+        shapes.rect(pBoxX, pBoxY, boxW, 2); 
+        shapes.rect(pBoxX, pBoxY + boxH - 2, boxW, 2); 
+        shapes.rect(pBoxX, pBoxY, 2, boxH); 
+        shapes.rect(pBoxX + boxW - 2, pBoxY, 2, boxH); 
 
-        // Mode Selector: LOGIN button box
+        
         shapes.setColor(0.16f, 0.16f, 0.28f, 0.9f);
         shapes.rect(lBtnX, lBtnY, btnW, btnH);
         if (!isRegisterMode) {
             if (activeFieldIndex == 2) {
-                shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f); // Active focused
+                shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f); 
             } else {
-                shapes.setColor(0.35f, 0.30f, 0.65f, 0.9f); // Selected
+                shapes.setColor(0.35f, 0.30f, 0.65f, 0.9f); 
             }
         } else {
-            shapes.setColor(0.20f, 0.20f, 0.30f, 0.3f); // Unselected
+            shapes.setColor(0.20f, 0.20f, 0.30f, 0.3f); 
         }
         shapes.rect(lBtnX, lBtnY, btnW, 2);
         shapes.rect(lBtnX, lBtnY + btnH - 2, btnW, 2);
         shapes.rect(lBtnX, lBtnY, 2, btnH);
         shapes.rect(lBtnX + btnW - 2, lBtnY, 2, btnH);
 
-        // Mode Selector: REGISTER button box
+        
         shapes.setColor(0.16f, 0.16f, 0.28f, 0.9f);
         shapes.rect(rBtnX, rBtnY, btnW, btnH);
         if (isRegisterMode) {
             if (activeFieldIndex == 2) {
-                shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f); // Active focused
+                shapes.setColor(0.3f, 0.9f, 1.0f, 0.8f); 
             } else {
-                shapes.setColor(0.35f, 0.30f, 0.65f, 0.9f); // Selected
+                shapes.setColor(0.35f, 0.30f, 0.65f, 0.9f); 
             }
         } else {
-            shapes.setColor(0.20f, 0.20f, 0.30f, 0.3f); // Unselected
+            shapes.setColor(0.20f, 0.20f, 0.30f, 0.3f); 
         }
         shapes.rect(rBtnX, rBtnY, btnW, 2);
         shapes.rect(rBtnX, rBtnY + btnH - 2, btnW, 2);
@@ -275,10 +287,25 @@ public class MainMenuScreen extends ScreenAdapter {
         shapes.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // Text rendering pass
+        
         game.batch.begin();
 
-        // Title with subtle vertical bob
+        
+        float btnLeaderX = w - 72 - 30;
+        float btnLeaderY = h - 64 - 30;
+        float mouseX = Gdx.input.getX();
+        float mouseY = h - Gdx.input.getY();
+        boolean hover = (mouseX >= btnLeaderX && mouseX <= btnLeaderX + 72 && mouseY >= btnLeaderY && mouseY <= btnLeaderY + 64);
+
+        if (hover) {
+            game.batch.setColor(0.85f, 0.7f, 1.0f, 1.0f); 
+        } else {
+            game.batch.setColor(1.0f, 1.0f, 1.0f, 0.85f); 
+        }
+        game.batch.draw(leaderboardIcon, btnLeaderX, btnLeaderY, 72, 64);
+        game.batch.setColor(Color.WHITE); 
+
+        
         float bob = 6f * (float) Math.sin(time * 1.5);
         glyphLayout.setText(titleFont, "CHAOTIC TOWER");
         titleFont.draw(game.batch, "CHAOTIC TOWER", cx - glyphLayout.width / 2, h - 140 + bob);
@@ -287,23 +314,20 @@ public class MainMenuScreen extends ScreenAdapter {
             glyphLayout.setText(menuFont, isRegisterMode ? "Registering account..." : "Logging in to server...");
             menuFont.draw(game.batch, isRegisterMode ? "Registering account..." : "Logging in to server...", cx - glyphLayout.width / 2, h / 2f + 95);
         } else {
-            glyphLayout.setText(smallFont, "TAB/Arrow keys to navigate field focus. Press ENTER to submit.");
-            smallFont.draw(game.batch, "TAB/Arrow keys to navigate field focus. Press ENTER to submit.", cx - glyphLayout.width / 2, h / 2f + 95);
-
-            // Username text
+            
             String uCursor = (activeFieldIndex == 0 && (int)(time * 2) % 2 == 0) ? "_" : "";
             String uText = "User: " + typedName + uCursor;
             glyphLayout.setText(menuFont, uText);
             menuFont.draw(game.batch, uText, uBoxX + 15, uBoxY + boxH / 2f + glyphLayout.height / 2f - 2f);
 
-            // Password text
+            
             String pCursor = (activeFieldIndex == 1 && (int)(time * 2) % 2 == 0) ? "_" : "";
             String masked = "*".repeat(typedPassword.length());
             String pText = "Pass: " + masked + pCursor;
             glyphLayout.setText(menuFont, pText);
             menuFont.draw(game.batch, pText, pBoxX + 15, pBoxY + boxH / 2f + glyphLayout.height / 2f - 2f);
 
-            // Mode LOGIN button label
+            
             String lBtnText = "LOGIN";
             glyphLayout.setText(menuFont, lBtnText);
             if (!isRegisterMode) {
@@ -314,7 +338,7 @@ public class MainMenuScreen extends ScreenAdapter {
             menuFont.draw(game.batch, lBtnText, lBtnX + btnW / 2f - glyphLayout.width / 2f, lBtnY + btnH / 2f + glyphLayout.height / 2f - 2f);
             menuFont.setColor(Color.WHITE);
 
-            // Mode REGISTER button label
+            
             String rBtnText = "REGISTER";
             glyphLayout.setText(menuFont, rBtnText);
             if (isRegisterMode) {
@@ -325,7 +349,7 @@ public class MainMenuScreen extends ScreenAdapter {
             menuFont.draw(game.batch, rBtnText, rBtnX + btnW / 2f - glyphLayout.width / 2f, rBtnY + btnH / 2f + glyphLayout.height / 2f - 2f);
             menuFont.setColor(Color.WHITE);
 
-            // Error display
+            
             if (errorMessage.length() > 0) {
                 smallFont.setColor(1f, 0.4f, 0.4f, 1);
                 glyphLayout.setText(smallFont, errorMessage);
@@ -336,7 +360,7 @@ public class MainMenuScreen extends ScreenAdapter {
 
         game.batch.end();
 
-        // Reset scales to prevent affecting other screens
+        
         titleFont.getData().setScale(1.0f);
         menuFont.getData().setScale(1.0f);
         smallFont.getData().setScale(1.0f);
@@ -360,8 +384,20 @@ public class MainMenuScreen extends ScreenAdapter {
     }
 
     @Override
-    public void hide() { Gdx.input.setInputProcessor(null); }
+    public void hide() {
+        Gdx.input.setInputProcessor(null);
+        dispose();
+    }
 
     @Override
-    public void dispose() { if (shapes != null) shapes.dispose(); }
+    public void dispose() {
+        if (shapes != null) {
+            shapes.dispose();
+            shapes = null;
+        }
+        if (leaderboardIcon != null) {
+            leaderboardIcon.dispose();
+            leaderboardIcon = null;
+        }
+    }
 }

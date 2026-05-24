@@ -4,11 +4,7 @@ import com.alfa.chaotictower.entity.Block;
 import com.alfa.chaotictower.magic.Spell;
 import com.alfa.chaotictower.magic.SpellContext;
 
-/**
- * Light Magic: Lightning
- * Destroys the most recently placed block — useful for recovering
- * from bad placements before they cause collapse.
- */
+
 public class LightningSpell extends Spell {
 
     public LightningSpell() {

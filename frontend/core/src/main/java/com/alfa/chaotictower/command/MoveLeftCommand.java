@@ -3,7 +3,7 @@ package com.alfa.chaotictower.command;
 import com.alfa.chaotictower.entity.Block;
 import com.badlogic.gdx.math.Vector2;
 
-/** Shifts the controlled block one step to the left. */
+
 public class MoveLeftCommand implements InputCommand {
 
     private static final float MOVE_STEP = 0.5f;
@@ -18,7 +18,7 @@ public class MoveLeftCommand implements InputCommand {
         
         block.body.setTransform(newX, pos.y, block.body.getAngle());
         if (CollisionUtils.hasOverlap(block.body, block.body.getWorld())) {
-            // Revert movement to avoid physical overlap and subsequent drift
+            
             block.body.setTransform(origX, pos.y, block.body.getAngle());
         }
     }

@@ -13,6 +13,7 @@ public class Player {
     private float spawnTimer = 0;
     private float invulnerableTimer = 0;
     private float maxHeight = 0f;
+    private int blocksSpawnedCount = 0;
 
     public Player(int id, float spawnX, float spawnY) {
         this(id, spawnX, spawnY, 3);
@@ -27,14 +28,27 @@ public class Player {
     }
 
     public void spawnNewBlock(World world) {
+        spawnNewBlock(world, false);
+    }
+
+    public void spawnNewBlock(World world, boolean isPuzzleMode) {
         float scale = isWeighted() ? 2.0f : 1.0f;
-        currentBlock = BlockFactory.getInstance().spawnBlock(world, spawnX, spawnY, id, scale);
+        currentBlock = BlockFactory.getInstance().spawnBlock(world, spawnX, spawnY, id, scale, isPuzzleMode, blocksSpawnedCount);
+        blocksSpawnedCount++;
         if (isFrosted()) {
             currentBlock.setFrosted(true);
             for (com.badlogic.gdx.physics.box2d.Fixture f : currentBlock.body.getFixtureList()) {
                 f.setFriction(0.02f);
             }
         }
+    }
+
+    public int getBlocksSpawnedCount() {
+        return blocksSpawnedCount;
+    }
+
+    public void resetBlocksSpawnedCount() {
+        this.blocksSpawnedCount = 0;
     }
 
     public Block getCurrentBlock() {
@@ -82,10 +96,7 @@ public class Player {
         return id;
     }
 
-    /**
-     * Update the maximum tower height for this player.
-     * Only stores the highest value ever recorded.
-     */
+    
     public void updateMaxHeight(float height) {
         if (height > maxHeight) {
             maxHeight = height;
@@ -96,7 +107,7 @@ public class Player {
         return maxHeight;
     }
 
-    // ─── Spell effect flags ────────────────────────────────────────
+    
     private boolean frosted = false;
     private boolean weighted = false;
     private boolean spedUp = false;

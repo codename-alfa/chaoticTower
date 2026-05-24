@@ -3,16 +3,10 @@ package com.alfa.chaotictower.command;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 
-/**
- * Utility class for checking physical overlaps in the Box2D world.
- */
+
 public class CollisionUtils {
 
-    /**
-     * Checks whether any fixture of the given body overlaps with other bodies
-     * by querying the AABB of each fixture.
-     * Shrinks the query bounding boxes slightly to allow perfectly adjacent placements.
-     */
+    
     public static boolean hasOverlap(Body body, World world) {
         for (Fixture fixture : body.getFixtureList()) {
             Shape shape = fixture.getShape();
@@ -27,7 +21,7 @@ public class CollisionUtils {
         if (shape instanceof PolygonShape) {
             PolygonShape poly = (PolygonShape) shape;
 
-            // Compute world-space AABB of this fixture
+            
             float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE;
             float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
 
@@ -41,21 +35,21 @@ public class CollisionUtils {
                 maxY = Math.max(maxY, worldV.y);
             }
 
-            // Shrink AABB slightly to avoid false positives at touching edges
+            
             float shrink = 0.02f;
             minX += shrink; minY += shrink;
             maxX -= shrink; maxY -= shrink;
 
-            // Query world for overlapping fixtures
+            
             final boolean[] found = { false };
             world.QueryAABB(new QueryCallback() {
                 @Override
                 public boolean reportFixture(Fixture f) {
                     if (f.getBody() != body) {
                         found[0] = true;
-                        return false; // Stop query
+                        return false; 
                     }
-                    return true; // Continue query
+                    return true; 
                 }
             }, minX, minY, maxX, maxY);
 

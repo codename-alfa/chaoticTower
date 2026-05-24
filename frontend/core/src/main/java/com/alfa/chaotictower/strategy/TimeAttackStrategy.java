@@ -2,15 +2,11 @@ package com.alfa.chaotictower.strategy;
 
 import com.alfa.chaotictower.entity.Player;
 
-/**
- * Time Attack Mode (Single Player only):
- *   Reach the target height before time runs out.
- *   Player has 3 lives; losing all lives also ends the game.
- */
+
 public class TimeAttackStrategy implements GameModeStrategy {
 
-    private static final float TARGET_HEIGHT = 20f;  // 20 meters
-    private static final double TIME_LIMIT   = 120.0; // 2 minutes
+    private static final float TARGET_HEIGHT = 20f;  
+    private static final double TIME_LIMIT   = 120.0; 
 
     @Override
     public String getModeName() {
@@ -24,13 +20,13 @@ public class TimeAttackStrategy implements GameModeStrategy {
 
     @Override
     public boolean checkWinCondition(Player[] players, double elapsedTime, float[] maxHeights) {
-        // Win if player reaches target height before time limit
+        
         return maxHeights.length > 0 && maxHeights[0] >= TARGET_HEIGHT && elapsedTime <= TIME_LIMIT;
     }
 
     @Override
     public boolean checkLoseCondition(Player[] players, double elapsedTime) {
-        // Lose if time runs out or all lives are lost
+        
         if (elapsedTime > TIME_LIMIT) return true;
         for (Player p : players) {
             if (p != null && p.getLives() <= 0) return true;

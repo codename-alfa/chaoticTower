@@ -8,6 +8,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -18,6 +19,7 @@ public class ModeSelectScreen extends ScreenAdapter {
     private final Long loggedInPlayerId;
 
     private ShapeRenderer shapes;
+    private Texture leaderboardIcon;
     private BitmapFont titleFont, menuFont, smallFont;
     private final GlyphLayout glyph = new GlyphLayout();
 
@@ -27,11 +29,11 @@ public class ModeSelectScreen extends ScreenAdapter {
     private boolean transitioning = false;
     private float time = 0;
 
-    private static final String[] SP_MODES = {"Survival", "Time Attack", "Puzzle"};
+    private static final String[] SP_MODES = {"Survival", "Race", "Puzzle"};
     private static final String[] MP_MODES = {"Survival", "Race", "Puzzle"};
     private static final String[] SP_DESC = {
         "Build high with 3 lives!",
-        "Reach 20m height within 2 minutes!",
+        "Reach the 20m finish line!",
         "Fit blocks below the laser line!"
     };
     private static final String[] MP_DESC = {
@@ -54,6 +56,7 @@ public class ModeSelectScreen extends ScreenAdapter {
     @Override
     public void show() {
         shapes = new ShapeRenderer();
+        leaderboardIcon = new Texture(Gdx.files.internal("leaderboard.png"));
         GameAssetManager assets = GameAssetManager.getInstance();
         titleFont = assets.getFont(GameAssetManager.FONT_TITLE);
         menuFont  = assets.getFont(GameAssetManager.FONT_MENU);
@@ -85,6 +88,22 @@ public class ModeSelectScreen extends ScreenAdapter {
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
         game.batch.begin();
+
+        
+        float btnLeaderX = w - 72 - 30;
+        float btnLeaderY = h - 64 - 30;
+        float mouseX = Gdx.input.getX();
+        float mouseY = h - Gdx.input.getY();
+        boolean hoverLeader = (mouseX >= btnLeaderX && mouseX <= btnLeaderX + 72 && mouseY >= btnLeaderY && mouseY <= btnLeaderY + 64);
+
+        if (hoverLeader) {
+            game.batch.setColor(0.85f, 0.7f, 1.0f, 1.0f); 
+        } else {
+            game.batch.setColor(1.0f, 1.0f, 1.0f, 0.85f); 
+        }
+        game.batch.draw(leaderboardIcon, btnLeaderX, btnLeaderY, 72, 64);
+        game.batch.setColor(Color.WHITE); 
+
         titleFont.getData().setScale(0.75f);
         glyph.setText(titleFont, "SELECT MODE");
         titleFont.draw(game.batch, "SELECT MODE", cx - glyph.width / 2, h - 60);
@@ -105,7 +124,7 @@ public class ModeSelectScreen extends ScreenAdapter {
         handleInput();
     }
 
-    // ── Player count cards ─────────────────────────────────
+    
     private void drawPlayerCards(float cx, float h) {
         float cardW = 540, cardH = 110, gap = 25;
         float totalH = cardH * 2 + gap;
@@ -153,7 +172,7 @@ public class ModeSelectScreen extends ScreenAdapter {
         smallFont.setColor(Color.WHITE);
     }
 
-    // ── Game mode cards ────────────────────────────────────
+    
     private void drawModeCards(float cx, float h) {
         String[] modes = (playerCount == 1) ? SP_MODES : MP_MODES;
         float cardW = 620, cardH = 110, gap = 20;
@@ -201,12 +220,22 @@ public class ModeSelectScreen extends ScreenAdapter {
         smallFont.setColor(Color.WHITE);
     }
 
-    // ── Input ──────────────────────────────────────────────
+    
     private void handleInput() {
         float w = Gdx.graphics.getWidth(), h = Gdx.graphics.getHeight();
         float cx = w / 2f;
         float mouseX = Gdx.input.getX();
         float mouseY = h - Gdx.input.getY();
+
+        
+        float btnLeaderX = w - 72 - 30;
+        float btnLeaderY = h - 64 - 30;
+        if (mouseX >= btnLeaderX && mouseX <= btnLeaderX + 72 && mouseY >= btnLeaderY && mouseY <= btnLeaderY + 64) {
+            if (Gdx.input.justTouched()) {
+                game.setScreen(new LeaderboardScreen(game, loggedInPlayerId));
+                return;
+            }
+        }
 
         if (selectionStep == 0) {
             float cardW = 540, cardH = 110, gap = 25;
@@ -269,6 +298,20 @@ public class ModeSelectScreen extends ScreenAdapter {
         game.setScreen(ps);
     }
 
-    @Override public void hide() { dispose(); }
-    @Override public void dispose() { if (shapes != null) shapes.dispose(); }
+    @Override
+    public void hide() {
+        dispose();
+    }
+
+    @Override
+    public void dispose() {
+        if (shapes != null) {
+            shapes.dispose();
+            shapes = null;
+        }
+        if (leaderboardIcon != null) {
+            leaderboardIcon.dispose();
+            leaderboardIcon = null;
+        }
+    }
 }

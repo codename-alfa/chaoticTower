@@ -5,10 +5,7 @@ import com.alfa.chaotictower.entity.Player;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.Array;
 
-/**
- * Context object passed to spells so they can interact with game state
- * without directly depending on PlayingScreen.
- */
+
 public class SpellContext {
     public final Player caster;
     public final Player target;
@@ -22,7 +19,7 @@ public class SpellContext {
         this.activeBlocks = activeBlocks;
     }
 
-    /** Find the most recently settled block owned by the target player. */
+    
     public Block getLastSettledBlock() {
         Block last = null;
         for (int i = activeBlocks.size - 1; i >= 0; i--) {

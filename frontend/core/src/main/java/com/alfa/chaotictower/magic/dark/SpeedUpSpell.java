@@ -3,12 +3,7 @@ package com.alfa.chaotictower.magic.dark;
 import com.alfa.chaotictower.magic.Spell;
 import com.alfa.chaotictower.magic.SpellContext;
 
-/**
- * Dark Magic: Speed Up
- * Forces the opponent's blocks to fall at 3x speed for 10 seconds.
- * The actual speed override is handled in SoftDropCommand / InputHandler
- * by checking player.isSpedUp().
- */
+
 public class SpeedUpSpell extends Spell {
 
     public SpeedUpSpell() {

@@ -30,7 +30,14 @@ public class LeaderboardService {
         Optional<Leaderboard> existing = leaderboardRepository.findByPlayer_IdAndGameMode(playerId, gameMode);
         if (existing.isPresent()) {
             Leaderboard entry = existing.get();
-            if (score > entry.getScore()) {
+            boolean isBetter = false;
+            if ("RACE".equalsIgnoreCase(gameMode)) {
+                isBetter = (score < entry.getScore());
+            } else {
+                isBetter = (score > entry.getScore());
+            }
+
+            if (isBetter) {
                 entry.setScore(score);
                 entry.setTimeRecord(timeRecord);
                 entry.setMaxHeight(maxHeight);
@@ -50,6 +57,10 @@ public class LeaderboardService {
     }
 
     public List<Leaderboard> getTop10Scores(String gameMode) {
-        return leaderboardRepository.findTop10ByGameModeOrderByScoreDesc(gameMode);
+        if ("RACE".equalsIgnoreCase(gameMode)) {
+            return leaderboardRepository.findTop10ByGameModeOrderByScoreAsc(gameMode);
+        } else {
+            return leaderboardRepository.findTop10ByGameModeOrderByScoreDesc(gameMode);
+        }
     }
 }

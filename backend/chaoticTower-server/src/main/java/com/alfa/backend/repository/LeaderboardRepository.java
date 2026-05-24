@@ -10,5 +10,6 @@ import java.util.Optional;
 @Repository
 public interface LeaderboardRepository extends JpaRepository<Leaderboard, Long> {
     List<Leaderboard> findTop10ByGameModeOrderByScoreDesc(String gameMode);
+    List<Leaderboard> findTop10ByGameModeOrderByScoreAsc(String gameMode);
     Optional<Leaderboard> findByPlayer_IdAndGameMode(Long playerId, String gameMode);
 }
