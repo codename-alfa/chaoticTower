@@ -1,6 +1,11 @@
 # Chaotic Tower 🧱🔮
 
-A physics-based competitive tower-stacking game inspired by Tricky Towers and Tetris. Built with a modular monorepo architecture, the game features realistic Box2D physics, real-time local multiplayer, randomized magic spells, endless and objective-driven game modes, and secure online accounts with competitive global leaderboards.
+```bash
+Nama    : Danish Al Fayyadh Sunarta
+NPM     : 2406416951
+```
+
+Chaotic Tower is a physics-based competitive tower-stacking game inspired by Tricky Towers and Tetris. Built with a modular monorepo architecture, the game features realistic Box2D physics, real-time local multiplayer, randomized magic spells, endless and objective-driven game modes, and secure online accounts with competitive global leaderboards.
 
 ---
 

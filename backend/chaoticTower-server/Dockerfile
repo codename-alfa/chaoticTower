@@ -1,4 +1,4 @@
-# Stage 1: Build stage
+# Stage 1: Build stage (Force rebuild to bust cache)
 FROM eclipse-temurin:17-jdk-alpine AS build
 WORKDIR /app
 COPY . .
