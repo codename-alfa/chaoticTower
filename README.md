@@ -51,6 +51,17 @@ Chaotic Tower merupakan game *physics-based competitive tower-stacking* yang ter
 *   **Database:** PostgreSQL.
 *   **Authentication:** *Dedicated controller* untuk *secure login* dan *register* dengan validasi keunikan nama pengguna (*unique constraint*) dan pencocokan sandi terenkripsi.
 
+### REST API Endpoints
+
+| HTTP Method | Endpoint | Parameter / Path Variable | Fungsi |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/players/login` | `username`, `password` (Query Params) | Melakukan autentikasi masuk player. |
+| `POST` | `/api/players/register` | `username`, `password` (Query Params) | Mendaftarkan akun player baru. |
+| `GET` | `/api/players/{id}` | `{id}` (Path Variable) | Mengambil informasi detail data player berdasarkan ID. |
+| `POST` | `/api/leaderboard/submit` | `playerId`, `gameMode`, `score`, `timeRecord`, `maxHeight` (Query Params) | Mengirimkan skor dan statistik game ke leaderboard. |
+| `GET` | `/api/leaderboard/top10` | `gameMode` (Query Param) | Mengambil 10 skor teratas untuk mode game tertentu. |
+| `POST` | `/api/achievements/unlock` | `playerId`, `achievementName` (Query Params) | Membuka pencapaian (achievement) untuk player tertentu. |
+
 ---
 
 ## Directory Structure
@@ -97,7 +108,7 @@ Jika Anda ingin menjalankan game dari source code:
 
 Untuk membantu memahami skema *database* dan *game client loop*, berikut adalah *Entity-Relationship Diagram* (ERD) serta *Game Loop Flowchart* yang menjelaskan arsitektur sistem game ini.
 
-### ntity-Relationship Diagram (ERD)
+### Entity-Relationship Diagram (ERD)
 ```mermaid
 erDiagram
     players {
@@ -150,6 +161,58 @@ graph TD
     N --> O["Blit Centered Leaderboard Status Prompts"]
     O -->|Press SPACE| C
 ```
+
+---
+
+## Detail Implementasi Teknis
+
+### 1. Controlled vs Settled State (Box2D Physics)
+Untuk menjaga kestabilan menara balok saat disusun, game membagi kondisi fisik balok menjadi dua state utama:
+*   **Controlled State**: Ketika balok aktif sedang dikontrol oleh pemain (turun dari atas), status fisiknya diatur sebagai `DynamicBody` namun dengan `gravityScale = 0`. Untuk mencegah balok stuck atau menyeret menara saat pemain mencoba memasukkan balok ke celah sempit, friction di-nol-kan sementara melalui `preSolve` contact handling. Pemain mengontrol balok secara diskrit dengan pergeseran horizontal konstan sebesar `0.5f` unit.
+*   **Settled State**: Ketika bagian bawah balok aktif menyentuh pedestal atau balok lain, status fisiknya secara otomatis beralih. Gravitasi penuh diaktifkan (`gravityScale = 1.2f`), friction ditingkatkan kembali menjadi `0.55f` (friction penuh), dan `angularDamping = 2.5f` dipasang untuk meredam jitter berlebih agar struktur menara tetap kokoh.
+
+### 2. Deferred Execution (Penundaan Perubahan State Fisik)
+Dalam engine Box2D, melakukan modifikasi langsung pada properti fisik objek (seperti mengubah properti body, fixture, atau membuat joint) di dalam callback listener tabrakan (`beginContact` atau `preSolve`) akan memicu crash memori pada JVM (Exit Value 1). 
+Proyek ini mengatasinya dengan menerapkan sistem **Deferred Execution Queue** (`blocksToSettle` queue). Segala bentuk perubahan state fisik atau manipulasi objek Box2D akan ditampung terlebih dahulu dalam antrean, lalu dieksekusi dengan aman pada akhir frame setelah simulasi langkah dunia fisika (`world.step()`) selesai diproses.
+
+### 3. Implementasi 9 Design Patterns
+Arsitektur game dirancang menggunakan pola desain standar industri untuk memisahkan logika dan meningkatkan efisiensi sistem:
+*   **Game Loop Pattern**: Menggunakan LibGDX default game loop cycle melalui fungsi `render()` sebagai main loop untuk update state physics dan graphics rendering secara berkala.
+*   **Singleton Pattern**: Diterapkan pada `GameAssetManager` dan `BlockFactory` agar hanya ada satu instance yang menangani asset load dan pembuatan objek blocks di seluruh cycle aplikasi.
+*   **State Pattern**: Mengatur alur navigasi antar-screen menggunakan interface `Screen` LibGDX (transisi dinamis dari `MainMenuScreen` → `ModeSelectScreen` → `PlayingScreen` → `GameOverScreen`).
+*   **Factory Pattern**: Diterapkan pada `BlockFactory` untuk mengotomatisasi produksi 7 variasi bentuk Tetromino blocks berdasarkan parameter definisi shape yang telah ditentukan.
+*   **Object Pool Pattern (`Pool<Block>`)**: recycle objek `Block` yang sudah dihancurkan atau jatuh keluar batas layar untuk menghindari memory leak dan mencegah lag akibat Garbage Collection spikes.
+*   **Observer Pattern**: Menggunakan Box2D `ContactListener` untuk memantau collisions antar blocks (`beginContact`) dan mengatur perubahan fisik secara asinkron sebelum world physics di-solve (`preSolve`).
+*   **Strategy Pattern (`GameModeStrategy`)**: Memisahkan logic pengecekan kondisi menang/kalah serta pesan akhir untuk mode Survival, Race, dan Puzzle secara modular.
+*   **Command Pattern (`InputCommand`)**: Memetakan penekanan keyboard (WASD untuk P1 dan Arrow Keys untuk P2) menjadi objek command (`MoveLeftCommand`, `MoveRightCommand`, `RotateCommand`, `SoftDropCommand`) guna mendukung kontrol local multiplayer yang fleksibel.
+*   **Repository / DAO Pattern**: Menggunakan antarmuka Spring Data JPA (`PlayerRepository`, `LeaderboardRepository`, dll.) pada sisi backend untuk memisahkan layer akses data database PostgreSQL dari bisnis logika server.
+
+### 4. Magic Spell System Mechanics
+Sistem spell diimplementasikan secara dinamis menggunakan pelacakan ketinggian menara:
+*   Pemain mendapatkan random spell setiap kali menara berhasil melewati kelipatan ketinggian 4 meter (*height milestone*).
+*   Masing-masing spell berinteraksi langsung dengan sistem Box2D, seperti mengubah body type menjadi immovable static (`CementSpell`), menghubungkan dua balok teratas secara kaku menggunakan `WeldJoint` (`IvySpell`), menghancurkan balok (`LightningSpell`), atau memaksa fixture lawan menjadi super licin dengan friction `0.02f` (`FrostSpell`).
+
+---
+
+## Tantangan & Hambatan Development
+
+Dalam proses men-develop Chaotic Tower, terdapat beberapa tantangan teknis krusial yang developer hadapi:
+
+### 1. JVM Crash Akibat Modifikasi Physics Box2D Saat Simulasi
+*   **Masalah**: Box2D melarang keras modifikasi struktur fisik body, fixture, atau pembuatan joint di tengah proses kalkulasi collision (di dalam callback `ContactListener` seperti `beginContact` atau `preSolve`). Melanggar aturan ini menyebabkan corrupt memory dan game langsung crash.
+*   **Solusi**: Menerapkan sistem *Deferred Execution Queue* (`blocksToSettle`). Callback tabrakan hanya mendaftarkan aksi perubahan ke dalam antrean aman, yang kemudian dieksekusi secara berurutan tepat setelah langkah simulasi fisika (`world.step()`) selesai diproses pada main loop.
+
+### 2. Physics Tuning Agar Terasa Kokoh Tanpa Jittering
+*   **Masalah**: Menara balok rawan runtuh akibat goyangan kecil (*micro-nudging*) atau tabrakan hantu (*ghost collisions*) saat balok Tetromino dengan bentuk rumit mendarat. Balok juga sering stuck di dinding samping saat pemain berusaha memasukkannya ke sela sempit.
+*   **Solusi**: Mengurangi batas hitbox fixture sebesar `-0.01f`, menerapkan skala objek `0.5f` agar manuver lebih luwes, serta merancang transisi *Controlled State* (bebas gesekan di dinding samping menggunakan pre-solve filter) ke *Settled State* (menerapkan `angularDamping = 2.5f` dan `gravityScale = 1.2f` untuk meredam getaran). physics-nya masih jauh dari mendekati physics pada game tricky towers seperti yang developer harapkan, namun sudah cukup memuaskan untuk saat ini.
+
+### 3. Koneksi API & Sinkronisasi Server Railway yang Tidak Stabil
+*   **Masalah**: Saat pemain bergonta-ganti mode leaderboard atau mengirimkan skor game over, koneksi API HTTP terkadang putus mendadak (*failed to load* atau *game over terpaksa*). Ini disebabkan oleh *cold starts* pada hosting server Railway gratisan, beban pool koneksi database PostgreSQL, serta masalah *CORS Policy* pada client desktop.
+*   **Solusi**: Mengoptimalkan penanganan pengecualian pada `ApiClient.java`, serta mengonfigurasi CORS di Spring Boot backend agar mengizinkan request cross-origin dari client game desktop secara aman.
+
+### 4. OpenGL Buffer Crash Saat Transisi Screen (No Buffer Allocated)
+*   **Masalah**: Jika tombol pemilihan mode ditekan sebelum proses rendering `SpriteBatch` selesai sepenuhnya, perintah transisi screen `game.setScreen()` akan memanggil `dispose()` pada screen lama. Hal ini menyebabkan crash karena thread render masih mencoba menggambar menggunakan buffer objek yang sudah dihancurkan.
+*   **Solusi**: Memasang guard flag `transitioning` dan memindahkan seluruh deteksi aksi input (`handleInput()`) setelah blok perintah `batch.end()` selesai dipanggil.
 
 ---
 
