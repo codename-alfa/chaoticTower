@@ -8,19 +8,20 @@ import com.badlogic.gdx.utils.JsonValue;
 
 public class ApiClient {
 
-    private static final String BASE_URL = "http://localhost:8080/api";
+    private static final String BASE_URL = "https://chaotictower-production.up.railway.app/api";
 
     public interface ApiCallback {
         void onSuccess(JsonValue result);
+
         void onFailure(Throwable t);
     }
 
     public static void login(String username, String password, ApiCallback callback) {
         HttpRequestBuilder requestBuilder = new HttpRequestBuilder();
         Net.HttpRequest request = requestBuilder.newRequest()
-            .method(Net.HttpMethods.POST)
-            .url(BASE_URL + "/players/login?username=" + username + "&password=" + password)
-            .build();
+                .method(Net.HttpMethods.POST)
+                .url(BASE_URL + "/players/login?username=" + username + "&password=" + password)
+                .build();
 
         sendRequest(request, callback);
     }
@@ -28,19 +29,21 @@ public class ApiClient {
     public static void register(String username, String password, ApiCallback callback) {
         HttpRequestBuilder requestBuilder = new HttpRequestBuilder();
         Net.HttpRequest request = requestBuilder.newRequest()
-            .method(Net.HttpMethods.POST)
-            .url(BASE_URL + "/players/register?username=" + username + "&password=" + password)
-            .build();
+                .method(Net.HttpMethods.POST)
+                .url(BASE_URL + "/players/register?username=" + username + "&password=" + password)
+                .build();
 
         sendRequest(request, callback);
     }
 
-    public static void submitScore(Long playerId, String gameMode, int score, double timeRecord, double maxHeight, ApiCallback callback) {
+    public static void submitScore(Long playerId, String gameMode, int score, double timeRecord, double maxHeight,
+            ApiCallback callback) {
         HttpRequestBuilder requestBuilder = new HttpRequestBuilder();
         Net.HttpRequest request = requestBuilder.newRequest()
-            .method(Net.HttpMethods.POST)
-            .url(BASE_URL + "/leaderboard/submit?playerId=" + playerId + "&gameMode=" + gameMode + "&score=" + score + "&timeRecord=" + timeRecord + "&maxHeight=" + maxHeight)
-            .build();
+                .method(Net.HttpMethods.POST)
+                .url(BASE_URL + "/leaderboard/submit?playerId=" + playerId + "&gameMode=" + gameMode + "&score=" + score
+                        + "&timeRecord=" + timeRecord + "&maxHeight=" + maxHeight)
+                .build();
 
         sendRequest(request, callback);
     }
@@ -48,14 +51,15 @@ public class ApiClient {
     public static void getTop10Scores(String gameMode, ApiCallback callback) {
         HttpRequestBuilder requestBuilder = new HttpRequestBuilder();
         Net.HttpRequest request = requestBuilder.newRequest()
-            .method(Net.HttpMethods.GET)
-            .url(BASE_URL + "/leaderboard/top10?gameMode=" + gameMode)
-            .build();
+                .method(Net.HttpMethods.GET)
+                .url(BASE_URL + "/leaderboard/top10?gameMode=" + gameMode)
+                .build();
 
         sendRequest(request, callback);
     }
 
     private static void sendRequest(Net.HttpRequest request, ApiCallback callback) {
+        request.setTimeOut(5000);
         Gdx.net.sendHttpRequest(request, new Net.HttpResponseListener() {
             @Override
             public void handleHttpResponse(Net.HttpResponse httpResponse) {
@@ -68,7 +72,9 @@ public class ApiClient {
                         Gdx.app.postRunnable(() -> callback.onSuccess(json));
                     } else {
                         String errorBody = httpResponse.getResultAsString();
-                        Gdx.app.postRunnable(() -> callback.onFailure(new Exception(errorBody != null && !errorBody.trim().isEmpty() ? errorBody.trim() : "HTTP error " + statusCode)));
+                        Gdx.app.postRunnable(() -> callback.onFailure(
+                                new Exception(errorBody != null && !errorBody.trim().isEmpty() ? errorBody.trim()
+                                        : "HTTP error " + statusCode)));
                     }
                 } catch (Exception e) {
                     Gdx.app.postRunnable(() -> callback.onFailure(e));
