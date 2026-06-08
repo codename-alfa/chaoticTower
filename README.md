@@ -83,7 +83,7 @@ chaoticTower/
 ## How to Set Up & Run
 
 ### Cara Menjalankan Game (Pemain)
-1. Unduh rilisan game terbaru dari itch.io (dalam bentuk file `.zip`).
+1. Download release terbaru dari itch.io (dalam bentuk file `.zip`).
 2. Ekstrak file `.zip` tersebut di komputer Anda.
 3. Jalankan langsung file executable (`.exe`) game yang ada di dalamnya.
 
@@ -220,7 +220,7 @@ Dalam proses men-develop Chaotic Tower, terdapat beberapa tantangan teknis krusi
 
 Meskipun game ini sudah fully operational, berikut beberapa future roadmap enhancements:
 
-*   **Particle Effects Engine:** Integrasikan *particles framework* untuk menghasilkan umpan balik visual yang menyala saat balok bersentuhan dengan lantai/menara (*settling dust*), sambaran petir penghancur balok (*destruction sparks*), dan saat pelemparan *spells*.
-*   **Sprite-Based Block Textures:** Ganti penggambaran geometris berbasis objek persegi `ShapeRenderer` saat ini dengan gambar bertekstur *sprite-sheet* premium (seperti desain ubin bata, kayu, dan batu) guna menghadirkan visual retro berkualitas tinggi.
-*   **Achievement Tracking & Frontend UI:** Implementasikan layar antarmuka khusus *Achievements UI* di bagian *frontend* untuk mengambil dan menampilkan daftar trofi serta pencapaian yang telah dibuka (fitur ini sudah didukung secara penuh di sisi *backend server API* dan *database*).
-*   **Granular SFX Feedback:** Tambahkan efek suara kecil untuk benturan balok, perintah rotasi, serta ketukan saat menjatuhkan balok (*soft drop*) demi meningkatkan kedalaman suasana suara (*soundscape*) di samping musik utama BGM dan *magic spells*.
+*   **Visual & Sound Effects:** menambahkan sound effect saat block saling bersentuhan dan visual effect saat spell casting
+*   **Sprite-Based Block Textures:** Ganti ShapeRenderer geometris dengan sprite-sheet bertekstur untuk customization tambahan sesuai keinginan player
+*   **Achievement:** table databasenya sudah ada dan siap untuk digunakan, namun belum sempat implementasi achievements atau milestone untuk player peroleh dan UI untuk menampilkannya
+*   **Physics:** Penyempurnaan tuning physics lebih lanjut agar lebih nyaman untuk dimainkan seperti pada game Tricky Towers
